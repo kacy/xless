@@ -1,0 +1,25 @@
+# build output
+xless
+.build/
+*.app
+*.ipa
+
+# go
+*.exe
+*.test
+*.out
+
+# project
+CLAUDE.md
+.claude/
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# os
+.DS_Store
+Thumbs.db

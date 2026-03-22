@@ -1,0 +1,244 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B1000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001 /* AppDelegate.swift */; };
+		B1000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000002 /* ContentView.swift */; };
+		B1000003 /* WidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000003 /* WidgetProvider.swift */; };
+		B1000004 /* AppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000004 /* AppTests.swift */; };
+		B1000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B2000005 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B2000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B2000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B2000003 /* WidgetProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetProvider.swift; sourceTree = "<group>"; };
+		B2000004 /* AppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTests.swift; sourceTree = "<group>"; };
+		B2000005 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		B3000001 = {
+			isa = PBXGroup;
+			children = (
+				B2000001 /* AppDelegate.swift */,
+				B2000002 /* ContentView.swift */,
+				B2000003 /* WidgetProvider.swift */,
+				B2000004 /* AppTests.swift */,
+				B2000005 /* Assets.xcassets */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B4000001 /* MultiApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B6000001;
+			buildPhases = (
+				B5000001 /* Sources */,
+				B5000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MultiApp;
+			productType = "com.apple.product-type.application";
+		};
+		B4000002 /* MultiWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B6000002;
+			buildPhases = (
+				B5000002 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B8000001 /* PBXTargetDependency */,
+			);
+			name = MultiWidget;
+			productType = "com.apple.product-type.app-extension";
+		};
+		B4000003 /* MultiAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B6000003;
+			buildPhases = (
+				B5000003 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B8000002 /* PBXTargetDependency */,
+			);
+			name = MultiAppTests;
+			productType = "com.apple.product-type.bundle.unit-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		B8000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4000001 /* MultiApp */;
+		};
+		B8000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4000001 /* MultiApp */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXProject section */
+		B0000001 /* Project object */ = {
+			isa = PBXProject;
+			buildConfigurationList = B6000004;
+			mainGroup = B3000001;
+			targets = (
+				B4000001 /* MultiApp */,
+				B4000002 /* MultiWidget */,
+				B4000003 /* MultiAppTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B5000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				B1000001 /* AppDelegate.swift in Sources */,
+				B1000002 /* ContentView.swift in Sources */,
+			);
+		};
+		B5000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				B1000003 /* WidgetProvider.swift in Sources */,
+			);
+		};
+		B5000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				B1000004 /* AppTests.swift in Sources */,
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B5000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				B1000005 /* Assets.xcassets in Resources */,
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B7000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = TEAM456;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 2.1.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -DDEBUG -DFEATURE_FLAG";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiApp";
+			};
+			name = Debug;
+		};
+		B7000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = TEAM456;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 2.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiApp";
+			};
+			name = Release;
+		};
+		B7000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiApp.Widget";
+			};
+			name = Debug;
+		};
+		B7000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiApp.Widget";
+			};
+			name = Release;
+		};
+		B7000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiAppTests";
+			};
+			name = Debug;
+		};
+		B7000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.MultiAppTests";
+			};
+			name = Release;
+		};
+		B7000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		B7000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B6000001 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B7000001 /* Debug */,
+				B7000002 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+		B6000002 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B7000003 /* Debug */,
+				B7000004 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+		B6000003 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B7000005 /* Debug */,
+				B7000006 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+		B6000004 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B7000007 /* Debug */,
+				B7000008 /* Release */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B0000001 /* Project object */;
+}

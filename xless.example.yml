@@ -1,0 +1,51 @@
+# xless project configuration
+# copy this to xless.yml and adjust for your project.
+#
+# for xless-native projects (no .xcodeproj), this is the full config.
+# for xcodeproj projects, this file is an optional overlay — the xcodeproj
+# is the source of truth, and xless.yml overrides specific settings.
+
+# --- xless-native mode (no xcodeproj) ---
+
+project:
+  name: "MyApp"
+  bundle_id: "com.example.MyApp"
+  version: "1.0.0"
+  build_number: "1"
+
+build:
+  type: "simple"           # simple (swiftc) or spm (swift build)
+  sources: ["Sources/"]
+  min_ios: "16.0"
+  swift_flags: []
+
+signing:
+  identity: ""             # empty = ad-hoc for simulator
+  provisioning_profile: ""
+  entitlements: ""
+  team_id: ""
+
+defaults:
+  target: ""               # default build target name
+  config: "debug"          # debug or release
+  simulator: "iPhone 16 Pro"
+  device: ""
+
+# --- xcodeproj overlay mode ---
+# when a .xcodeproj is present, only the sections below are used.
+# the project/build/signing sections above are ignored.
+#
+# defaults:
+#   target: "MyApp"
+#   config: "debug"
+#   simulator: "iPhone 16 Pro"
+#
+# overrides:
+#   targets:
+#     MyApp:
+#       signing:               # full replace (all-or-nothing)
+#         identity: "Apple Development: you@example.com"
+#         provisioning_profile: "/path/to/profile.mobileprovision"
+#         team_id: "YOUR_TEAM_ID"
+#       swift_flags: ["-DXLESS_BUILD"]   # appended to xcodeproj flags
+#       min_ios: "17.0"                  # replaces xcodeproj value
