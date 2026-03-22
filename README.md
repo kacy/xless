@@ -37,7 +37,7 @@ xless run           # build and launch in simulator
 | `xless info` | display resolved project configuration |
 | `xless version` | print cli and toolchain versions |
 | `xless init` | scaffold a new project *(coming soon)* |
-| `xless build` | compile and bundle *(coming soon)* |
+| `xless build` | compile and bundle an ios app |
 | `xless run` | build, install, and launch *(coming soon)* |
 | `xless devices` | list simulators and physical devices *(coming soon)* |
 | `xless logs` | stream app logs *(coming soon)* |
@@ -84,6 +84,28 @@ multi-target projects work out of the box. use `--target` to select which one to
 ```sh
 xless build --target MyWidget
 ```
+
+### building
+
+`xless build` compiles swift sources, creates a `.app` bundle with `Info.plist`, and ad-hoc signs for the simulator:
+
+```sh
+$ xless build
+  info  build target=MyApp platform=simulator config=debug
+  info  compile files=3
+  info  bundle path=.build/MyApp/MyApp.app
+  info  sign identity=-
+  ok    build complete bundle=.build/MyApp/MyApp.app time=1.2s
+```
+
+use `--build-config release` for an optimized build, or `--platform device` for a device build (requires signing identity):
+
+```sh
+xless build --build-config release
+xless build --platform device
+```
+
+the build pipeline runs three stages in order: **compile** (swiftc), **bundle** (.app creation + Info.plist), and **sign** (codesign). if any stage fails, you get an error with a hint on what to fix.
 
 ### xless.yml overlay
 
@@ -145,6 +167,14 @@ $ xless info --json
 {"type":"data","message":"project","data":{"name":"MyApp","mode":"xcodeproj","targets":"3"}}
 {"type":"data","message":"target:MyApp","data":{"name":"MyApp","bundle_id":"com.example.MyApp",...}}
 {"type":"data","message":"defaults","data":{"config":"debug","simulator":"iPhone 16 Pro"}}
+
+$ xless build --json
+{"type":"info","message":"build","data":{"target":"MyApp","platform":"simulator","config":"debug"}}
+{"type":"info","message":"compile","data":{"files":"3"}}
+{"type":"info","message":"bundle","data":{"path":".build/MyApp/MyApp.app"}}
+{"type":"info","message":"sign","data":{"identity":"-"}}
+{"type":"success","message":"build complete","data":{"bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
+{"type":"data","message":"build","data":{"target":"MyApp","bundle_id":"com.example.MyApp","platform":"simulator","config":"debug","bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
 ```
 
 ## config resolution order

@@ -55,6 +55,7 @@ func init() {
 	rootCmd.PersistentFlags().String("platform", "", "build platform: simulator or device")
 	rootCmd.PersistentFlags().String("target", "", "build target name")
 	rootCmd.PersistentFlags().String("build-config", "", "build configuration: debug or release")
+	rootCmd.PersistentFlags().String("device", "", "device name or UDID for deployment")
 
 	_ = viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
 	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
@@ -63,6 +64,7 @@ func init() {
 	_ = viper.BindPFlag("platform", rootCmd.PersistentFlags().Lookup("platform"))
 	_ = viper.BindPFlag("target", rootCmd.PersistentFlags().Lookup("target"))
 	_ = viper.BindPFlag("build-config", rootCmd.PersistentFlags().Lookup("build-config"))
+	_ = viper.BindPFlag("device", rootCmd.PersistentFlags().Lookup("device"))
 
 	viper.SetEnvPrefix("XLESS")
 	viper.AutomaticEnv()
@@ -74,5 +76,6 @@ func cliFlags() config.CLIFlags {
 		Platform: viper.GetString("platform"),
 		Target:   viper.GetString("target"),
 		Config:   viper.GetString("build-config"),
+		Device:   viper.GetString("device"),
 	}
 }

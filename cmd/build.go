@@ -24,77 +24,83 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		start := time.Now()
 
-		dir, err := os.Getwd()
-		if err != nil {
-			out.Error("cannot determine working directory", "error", err.Error())
-			return
-		}
-
-		flags := cliFlags()
-		cfg, _, err := config.Load(dir, flags)
-		if err != nil {
-			out.Error(err.Error())
-			return
-		}
-
-		// resolve target
-		target := resolveTarget(cfg, flags)
-		if target == nil {
-			return
-		}
-
-		// resolve platform
-		platform := resolvePlatform(flags)
-
-		// resolve build config
-		buildConfig := resolveBuildConfig(flags, cfg)
-
-		// discover toolchain
-		tc, err := discoverToolchain(cmd)
-		if err != nil {
-			return
-		}
-
-		// set up build context
-		buildDir := filepath.Join(dir, ".build", target.Name)
-		bc := &build.BuildContext{
-			Ctx:         cmd.Context(),
-			Config:      cfg,
-			Target:      target,
-			Toolchain:   tc,
-			Platform:    platform,
-			BuildConfig: buildConfig,
-			ProjectDir:  dir,
-			BuildDir:    buildDir,
-			Out:         out,
-		}
-
-		out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig)
-
-		// run pipeline
-		pipeline := build.NewPipeline(
-			build.CompileStage{},
-			build.BundleStage{},
-			build.SignStage{},
-		)
-
-		if err := pipeline.Run(bc); err != nil {
-			out.Error(err.Error())
+		bc, cfg, ok := buildApp(cmd)
+		if !ok {
 			return
 		}
 
 		elapsed := time.Since(start)
+		_ = cfg // used only by run for deploy phase
 		out.Success("build complete", "bundle", bc.AppBundlePath, "time", elapsed.Round(time.Millisecond).String())
 
 		out.Data("build", output.OrderedMap{
-			{Key: "target", Value: target.Name},
-			{Key: "bundle_id", Value: target.BundleID},
-			{Key: "platform", Value: string(platform)},
-			{Key: "config", Value: buildConfig},
+			{Key: "target", Value: bc.Target.Name},
+			{Key: "bundle_id", Value: bc.Target.BundleID},
+			{Key: "platform", Value: string(bc.Platform)},
+			{Key: "config", Value: bc.BuildConfig},
 			{Key: "bundle", Value: bc.AppBundlePath},
 			{Key: "time", Value: elapsed.Round(time.Millisecond).String()},
 		})
 	},
+}
+
+// buildApp runs the standard build pipeline (compile → bundle → sign).
+// returns the build context, loaded config, and true on success.
+// on failure, errors are printed to out and false is returned.
+func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, bool) {
+	dir, err := os.Getwd()
+	if err != nil {
+		out.Error("cannot determine working directory", "error", err.Error())
+		return nil, nil, false
+	}
+
+	flags := cliFlags()
+	cfg, _, err := config.Load(dir, flags)
+	if err != nil {
+		out.Error(err.Error())
+		return nil, nil, false
+	}
+
+	target := resolveTarget(cfg, flags)
+	if target == nil {
+		return nil, nil, false
+	}
+
+	platform := resolvePlatform(flags)
+	buildConfig := resolveBuildConfig(flags, cfg)
+
+	tc, err := discoverToolchain(cmd)
+	if err != nil {
+		return nil, nil, false
+	}
+
+	buildDir := filepath.Join(dir, ".build", target.Name)
+	bc := &build.BuildContext{
+		Ctx:         cmd.Context(),
+		Config:      cfg,
+		Target:      target,
+		Toolchain:   tc,
+		Platform:    platform,
+		BuildConfig: buildConfig,
+		ProjectDir:  dir,
+		BuildDir:    buildDir,
+		Out:         out,
+	}
+
+	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig)
+
+	pipeline := build.NewPipeline(
+		build.CompileStage{},
+		build.BundleStage{},
+		build.SignStage{},
+	)
+
+	if err := pipeline.Run(bc); err != nil {
+		out.Error(err.Error())
+		return nil, nil, false
+	}
+
+	return bc, cfg, true
 }
 
 // resolveTarget picks the target from flags or config defaults.
