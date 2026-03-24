@@ -12,9 +12,11 @@ xless drives the apple toolchain directly — `swiftc`, `simctl`, `devicectl`, `
 # homebrew
 brew install kacy/tap/xless
 
-# or grab the latest binary
-curl -fsSL https://github.com/kacy/xless/releases/latest/download/install.sh | sh
+# or install the latest release from xless.dev
+curl -fsSL https://xless.dev/install.sh | sh
 ```
+
+the install script currently supports macOS on Apple Silicon (`arm64`) only.
 
 ## quick start
 

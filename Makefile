@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-.PHONY: build clean test vet
+.PHONY: build clean test vet package-release
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o xless .
@@ -14,3 +14,6 @@ test:
 
 vet:
 	go vet ./...
+
+package-release:
+	VERSION=$(VERSION) ./scripts/package-release.sh

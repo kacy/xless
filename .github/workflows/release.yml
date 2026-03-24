@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to package, for example v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve version
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ -z "${version}" ]]; then
+            echo "version is required" >&2
+            exit 1
+          fi
+
+          if [[ ! "${version}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "version contains unsupported characters: ${version}" >&2
+            exit 1
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "versioned_archive=xless_${version}_darwin_arm64.tar.gz" >> "${GITHUB_OUTPUT}"
+
+      - name: Package release bundle
+        run: ./scripts/package-release.sh
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+
+      - name: Upload release bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xless-${{ steps.vars.outputs.version }}-darwin-arm64
+          path: |
+            dist/${{ steps.vars.outputs.versioned_archive }}
+            dist/${{ steps.vars.outputs.versioned_archive }}.sha256
+            dist/xless_darwin_arm64.tar.gz
+            dist/xless_darwin_arm64.tar.gz.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          VERSIONED_ARCHIVE: ${{ steps.vars.outputs.versioned_archive }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          assets=(
+            "dist/${VERSIONED_ARCHIVE}"
+            "dist/${VERSIONED_ARCHIVE}.sha256"
+            "dist/xless_darwin_arm64.tar.gz"
+            "dist/xless_darwin_arm64.tar.gz.sha256"
+          )
+
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release upload "${VERSION}" "${assets[@]}" --clobber
+          else
+            gh release create "${VERSION}" "${assets[@]}" --title "${VERSION}" --generate-notes
+          fi

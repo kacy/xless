@@ -1,6 +1,7 @@
 # build output
 xless
 .build/
+dist/
 *.app
 *.ipa
 
