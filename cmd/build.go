@@ -56,7 +56,7 @@ var buildCmd = &cobra.Command{
 // on failure, errors are printed to out and false is returned.
 func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, bool) {
 	flags := cliFlags()
-	dir, cfg, _, err := loadProject(flags)
+	dir, cfg, det, err := loadProject(flags)
 	if err != nil {
 		out.Error(err.Error())
 		return nil, nil, false
@@ -87,20 +87,24 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 
 	buildDir := filepath.Join(dir, ".build", target.Name)
 	bc := &build.BuildContext{
-		Ctx:         cmd.Context(),
-		Config:      cfg,
-		Target:      target,
-		Toolchain:   tc,
-		Platform:    platform,
-		BuildConfig: buildConfig,
-		ProjectDir:  projectDir,
-		BuildDir:    buildDir,
-		Out:         out,
+		Ctx:          cmd.Context(),
+		Config:       cfg,
+		Target:       target,
+		Toolchain:    tc,
+		Platform:     platform,
+		BuildConfig:  buildConfig,
+		RootDir:      dir,
+		WorkspaceDir: det.WorkspaceDir,
+		XcodeprojDir: det.XcodeprojDir,
+		ProjectDir:   projectDir,
+		BuildDir:     buildDir,
+		Out:          out,
 	}
 
 	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig)
 
 	stages := []build.Stage{
+		build.PackageDependenciesStage{},
 		build.CompileStage{},
 		build.BundleStage{},
 		build.SignStage{},

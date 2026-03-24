@@ -254,6 +254,42 @@ func TestLoadXcodeproj(t *testing.T) {
 	}
 }
 
+func TestLoadXcodeprojResolvedPackages(t *testing.T) {
+	dir := t.TempDir()
+
+	xcodeprojDir := filepath.Join(dir, "SimpleApp.xcodeproj")
+	if err := os.MkdirAll(filepath.Join(xcodeprojDir, "project.xcworkspace", "xcshareddata", "swiftpm"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	data, err := os.ReadFile("../xcodeproj/testdata/simple.pbxproj")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(xcodeprojDir, "project.pbxproj"), data, 0o644); err != nil {
+		t.Fatalf("write pbxproj: %v", err)
+	}
+	resolvedData := `{"pins":[{"identity":"swift-collections","location":"https://github.com/apple/swift-collections.git","state":{"version":"1.1.0","revision":"abc123"}}],"version":2}`
+	resolvedPath := filepath.Join(xcodeprojDir, "project.xcworkspace", "xcshareddata", "swiftpm", "Package.resolved")
+	if err := os.WriteFile(resolvedPath, []byte(resolvedData), 0o644); err != nil {
+		t.Fatalf("write Package.resolved: %v", err)
+	}
+
+	cfg, _, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.PackageResolvedFile != resolvedPath {
+		t.Fatalf("resolved file = %q, want %q", cfg.PackageResolvedFile, resolvedPath)
+	}
+	if len(cfg.ResolvedPackages) != 1 {
+		t.Fatalf("resolved packages = %d, want 1", len(cfg.ResolvedPackages))
+	}
+	if cfg.ResolvedPackages[0].Identity != "swift-collections" {
+		t.Fatalf("resolved package identity = %q", cfg.ResolvedPackages[0].Identity)
+	}
+}
+
 func TestLoadXcodeprojWithOverlay(t *testing.T) {
 	dir := t.TempDir()
 
@@ -319,6 +355,78 @@ overrides:
 	}
 	if cfg.Defaults.Config != "release" {
 		t.Errorf("defaults.config = %q, want release", cfg.Defaults.Config)
+	}
+}
+
+func TestLoadWorkspaceResolvedPackages(t *testing.T) {
+	dir := t.TempDir()
+
+	workspaceDir := filepath.Join(dir, "Sample.xcworkspace")
+	if err := os.MkdirAll(filepath.Join(workspaceDir, "xcshareddata", "swiftpm"), 0o755); err != nil {
+		t.Fatalf("mkdir workspace swiftpm: %v", err)
+	}
+	workspaceData := `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+  <FileRef location="group:Member.xcodeproj"></FileRef>
+</Workspace>`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "contents.xcworkspacedata"), []byte(workspaceData), 0o644); err != nil {
+		t.Fatalf("write workspace data: %v", err)
+	}
+
+	xcodeprojDir := filepath.Join(dir, "Member.xcodeproj")
+	if err := os.MkdirAll(xcodeprojDir, 0o755); err != nil {
+		t.Fatalf("mkdir xcodeproj: %v", err)
+	}
+	data, err := os.ReadFile("../xcodeproj/testdata/simple.pbxproj")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(xcodeprojDir, "project.pbxproj"), data, 0o644); err != nil {
+		t.Fatalf("write pbxproj: %v", err)
+	}
+
+	resolvedPath := filepath.Join(workspaceDir, "xcshareddata", "swiftpm", "Package.resolved")
+	resolvedData := `{"pins":[{"identity":"alamofire","location":"https://github.com/Alamofire/Alamofire.git","state":{"version":"5.9.1","revision":"def456"}}],"version":2}`
+	if err := os.WriteFile(resolvedPath, []byte(resolvedData), 0o644); err != nil {
+		t.Fatalf("write Package.resolved: %v", err)
+	}
+
+	cfg, det, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if det.Mode != project.ModeWorkspace {
+		t.Fatalf("mode = %v, want %v", det.Mode, project.ModeWorkspace)
+	}
+	if cfg.PackageResolvedFile != resolvedPath {
+		t.Fatalf("resolved file = %q, want %q", cfg.PackageResolvedFile, resolvedPath)
+	}
+	if len(cfg.ResolvedPackages) != 1 {
+		t.Fatalf("resolved packages = %d, want 1", len(cfg.ResolvedPackages))
+	}
+	if cfg.ResolvedPackages[0].Identity != "alamofire" {
+		t.Fatalf("resolved package identity = %q", cfg.ResolvedPackages[0].Identity)
+	}
+}
+
+func TestLoadResolvedPackagesWarnsWhenMissing(t *testing.T) {
+	cfg := &ProjectConfig{
+		Targets: []TargetConfig{
+			{
+				Name:     "App",
+				Packages: []string{"WeatherKit"},
+			},
+		},
+	}
+	det := &project.DetectResult{}
+
+	loadResolvedPackages(cfg, det, "")
+
+	if len(det.Warnings) != 1 {
+		t.Fatalf("warnings = %v, want 1 warning", det.Warnings)
+	}
+	if got := det.Warnings[0]; got == "" {
+		t.Fatal("expected non-empty warning")
 	}
 }
 

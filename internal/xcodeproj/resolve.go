@@ -83,7 +83,9 @@ func resolveTarget(raw *RawProject, tObj map[string]any) (*XcodeTarget, error) {
 
 	// resolve build phases → source files and resources
 	buildPhaseIDs := getStringSlice(tObj, "buildPhases")
-	var sourceFiles, resourceFiles []string
+	var sourceFiles, resourceFiles, frameworkFiles []string
+	var linkInputs []LinkInput
+	var shellScriptPhases, copyFilesPhases []string
 
 	for _, phaseID := range buildPhaseIDs {
 		phaseObj := raw.Objects[phaseID]
@@ -99,6 +101,18 @@ func resolveTarget(raw *RawProject, tObj map[string]any) (*XcodeTarget, error) {
 			sourceFiles = append(sourceFiles, resolveFileRefs(raw, fileIDs)...)
 		case isaPBXResourcesBuildPhase:
 			resourceFiles = append(resourceFiles, resolveFileRefs(raw, fileIDs)...)
+		case isaPBXFrameworksBuildPhase:
+			phaseLinks := resolveLinkInputs(raw, fileIDs)
+			linkInputs = append(linkInputs, phaseLinks...)
+			for _, link := range phaseLinks {
+				if link.Path != "" {
+					frameworkFiles = append(frameworkFiles, link.Path)
+				}
+			}
+		case isaPBXShellScriptBuildPhase:
+			shellScriptPhases = append(shellScriptPhases, phaseName(phaseObj, "shell script"))
+		case isaPBXCopyFilesBuildPhase:
+			copyFilesPhases = append(copyFilesPhases, phaseName(phaseObj, "copy files"))
 		}
 	}
 
@@ -123,6 +137,7 @@ func resolveTarget(raw *RawProject, tObj map[string]any) (*XcodeTarget, error) {
 
 	packageDepIDs := getStringSlice(tObj, "packageProductDependencies")
 	var packageProducts []string
+	var packageReferences []string
 	for _, pkgID := range packageDepIDs {
 		pkgObj := raw.Objects[pkgID]
 		if pkgObj == nil || getString(pkgObj, "isa") != isaXCSwiftPackageProductDependency {
@@ -131,16 +146,24 @@ func resolveTarget(raw *RawProject, tObj map[string]any) (*XcodeTarget, error) {
 		if productName := getString(pkgObj, "productName"); productName != "" {
 			packageProducts = append(packageProducts, productName)
 		}
+		if ref := resolvePackageReference(raw, getString(pkgObj, "package")); ref != "" {
+			packageReferences = appendUnique(packageReferences, ref)
+		}
 	}
 
 	return &XcodeTarget{
-		Name:            name,
-		ProductType:     productType,
-		Configurations:  configs,
-		SourceFiles:     sourceFiles,
-		ResourceFiles:   resourceFiles,
-		Dependencies:    deps,
-		PackageProducts: packageProducts,
+		Name:              name,
+		ProductType:       productType,
+		Configurations:    configs,
+		SourceFiles:       sourceFiles,
+		ResourceFiles:     resourceFiles,
+		FrameworkFiles:    frameworkFiles,
+		LinkInputs:        linkInputs,
+		Dependencies:      deps,
+		PackageProducts:   packageProducts,
+		PackageReferences: packageReferences,
+		ShellScriptPhases: shellScriptPhases,
+		CopyFilesPhases:   copyFilesPhases,
 	}, nil
 }
 
@@ -241,6 +264,40 @@ func resolveFileRefs(raw *RawProject, buildFileIDs []string) []string {
 	return paths
 }
 
+func resolveLinkInputs(raw *RawProject, buildFileIDs []string) []LinkInput {
+	var inputs []LinkInput
+	groupPaths := buildGroupPaths(raw)
+
+	for _, bfID := range buildFileIDs {
+		bfObj := raw.Objects[bfID]
+		if bfObj == nil {
+			continue
+		}
+
+		fileRefID := getString(bfObj, "fileRef")
+		if fileRefID == "" {
+			continue
+		}
+
+		frObj := raw.Objects[fileRefID]
+		if frObj == nil {
+			continue
+		}
+
+		path := resolveFilePath(frObj, fileRefID, groupPaths)
+		if path == "" {
+			continue
+		}
+
+		inputs = append(inputs, LinkInput{
+			Path:       path,
+			SourceTree: getString(frObj, "sourceTree"),
+		})
+	}
+
+	return inputs
+}
+
 // resolveFilePath builds the path for a PBXFileReference by walking up the
 // group hierarchy based on sourceTree.
 func resolveFilePath(frObj map[string]any, fileRefID string, groupPaths map[string]string) string {
@@ -269,6 +326,49 @@ func resolveFilePath(frObj map[string]any, fileRefID string, groupPaths map[stri
 	default:
 		return path
 	}
+}
+
+func phaseName(phaseObj map[string]any, fallback string) string {
+	if name := getString(phaseObj, "name"); name != "" {
+		return name
+	}
+	return "unnamed " + fallback + " phase"
+}
+
+func resolvePackageReference(raw *RawProject, refID string) string {
+	if refID == "" {
+		return ""
+	}
+
+	refObj := raw.Objects[refID]
+	if refObj == nil {
+		return ""
+	}
+
+	switch getString(refObj, "isa") {
+	case isaXCRemoteSwiftPackageReference:
+		if url := getString(refObj, "repositoryURL"); url != "" {
+			return "remote " + url
+		}
+	case isaXCLocalSwiftPackageReference:
+		if path := getString(refObj, "relativePath"); path != "" {
+			return "local " + path
+		}
+		if path := getString(refObj, "path"); path != "" {
+			return "local " + path
+		}
+	}
+
+	return ""
+}
+
+func appendUnique(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
 }
 
 // FindConfig returns the build configuration with the given name from a target,

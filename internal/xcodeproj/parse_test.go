@@ -245,6 +245,11 @@ func TestResolvePackageProducts(t *testing.T) {
 			"pkg": {
 				"isa":         isaXCSwiftPackageProductDependency,
 				"productName": "WeatherKit",
+				"package":     "pkgref",
+			},
+			"pkgref": {
+				"isa":           isaXCRemoteSwiftPackageReference,
+				"repositoryURL": "https://example.com/weatherkit.git",
 			},
 		},
 	}
@@ -258,5 +263,97 @@ func TestResolvePackageProducts(t *testing.T) {
 	}
 	if len(xp.Targets[0].PackageProducts) != 1 || xp.Targets[0].PackageProducts[0] != "WeatherKit" {
 		t.Fatalf("package products = %v", xp.Targets[0].PackageProducts)
+	}
+	if len(xp.Targets[0].PackageReferences) != 1 || xp.Targets[0].PackageReferences[0] != "remote https://example.com/weatherkit.git" {
+		t.Fatalf("package references = %v", xp.Targets[0].PackageReferences)
+	}
+}
+
+func TestResolveBuildPhaseMetadata(t *testing.T) {
+	raw := &RawProject{
+		RootObject: "project",
+		Objects: map[string]map[string]any{
+			"project": {
+				"isa":     isaPBXProject,
+				"targets": []any{"target"},
+			},
+			"target": {
+				"isa":                    isaPBXNativeTarget,
+				"name":                   "App",
+				"productType":            productTypeApplication,
+				"buildConfigurationList": "configs",
+				"buildPhases":            []any{"frameworks", "script", "copy"},
+			},
+			"configs": {
+				"isa":                 isaXCConfigurationList,
+				"buildConfigurations": []any{"debug"},
+			},
+			"debug": {
+				"isa":           isaXCBuildConfiguration,
+				"name":          "Debug",
+				"buildSettings": map[string]any{},
+			},
+			"frameworks": {
+				"isa":   isaPBXFrameworksBuildPhase,
+				"files": []any{"frameworkBuildFile", "libraryBuildFile", "localFrameworkBuildFile"},
+			},
+			"frameworkBuildFile": {
+				"isa":     isaPBXBuildFile,
+				"fileRef": "frameworkRef",
+			},
+			"frameworkRef": {
+				"isa":        isaPBXFileReference,
+				"path":       "MapKit.framework",
+				"sourceTree": "SDKROOT",
+			},
+			"libraryBuildFile": {
+				"isa":     isaPBXBuildFile,
+				"fileRef": "libraryRef",
+			},
+			"libraryRef": {
+				"isa":        isaPBXFileReference,
+				"path":       "libsqlite3.tbd",
+				"sourceTree": "SDKROOT",
+			},
+			"localFrameworkBuildFile": {
+				"isa":     isaPBXBuildFile,
+				"fileRef": "localFrameworkRef",
+			},
+			"localFrameworkRef": {
+				"isa":        isaPBXFileReference,
+				"path":       "Vendor/WeatherKit.framework",
+				"sourceTree": "<group>",
+			},
+			"script": {
+				"isa":  isaPBXShellScriptBuildPhase,
+				"name": "Generate Assets",
+			},
+			"copy": {
+				"isa":  isaPBXCopyFilesBuildPhase,
+				"name": "Embed Support Files",
+			},
+		},
+	}
+
+	xp, err := Resolve(raw)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(xp.Targets) != 1 {
+		t.Fatalf("targets = %d, want 1", len(xp.Targets))
+	}
+
+	target := xp.Targets[0]
+	if len(target.FrameworkFiles) != 3 {
+		t.Fatalf("framework files = %v", target.FrameworkFiles)
+	}
+	if len(target.LinkInputs) != 3 {
+		t.Fatalf("link inputs = %v", target.LinkInputs)
+	}
+	if len(target.ShellScriptPhases) != 1 || target.ShellScriptPhases[0] != "Generate Assets" {
+		t.Fatalf("shell script phases = %v", target.ShellScriptPhases)
+	}
+	if len(target.CopyFilesPhases) != 1 || target.CopyFilesPhases[0] != "Embed Support Files" {
+		t.Fatalf("copy files phases = %v", target.CopyFilesPhases)
 	}
 }

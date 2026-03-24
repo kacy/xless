@@ -41,7 +41,30 @@ var infoCmd = &cobra.Command{
 			{Key: "name", Value: cfg.Project.Name},
 			{Key: "mode", Value: det.Mode.String()},
 			{Key: "targets", Value: fmt.Sprintf("%d", len(cfg.Targets))},
+			{Key: "resolved_packages", Value: fmt.Sprintf("%d", len(cfg.ResolvedPackages))},
 		})
+		if cfg.PackageResolvedFile != "" {
+			out.Data("package_resolution", output.OrderedMap{
+				{Key: "file", Value: cfg.PackageResolvedFile},
+				{Key: "packages", Value: fmt.Sprintf("%d", len(cfg.ResolvedPackages))},
+			})
+		}
+		for _, pkg := range cfg.ResolvedPackages {
+			packageMap := output.OrderedMap{
+				{Key: "identity", Value: pkg.Identity},
+				{Key: "location", Value: pkg.Location},
+			}
+			if pkg.Version != "" {
+				packageMap = append(packageMap, output.KV{Key: "version", Value: pkg.Version})
+			}
+			if pkg.Branch != "" {
+				packageMap = append(packageMap, output.KV{Key: "branch", Value: pkg.Branch})
+			}
+			if pkg.Revision != "" {
+				packageMap = append(packageMap, output.KV{Key: "revision", Value: pkg.Revision})
+			}
+			out.Data("package:"+pkg.Identity, packageMap)
+		}
 
 		targets, err := selectedTargets(cfg, flags)
 		if err != nil {
@@ -88,6 +111,30 @@ var infoCmd = &cobra.Command{
 			}
 			if len(t.Packages) > 0 {
 				targetMap = append(targetMap, output.KV{Key: "packages", Value: strings.Join(t.Packages, ", ")})
+			}
+			if len(t.PackageRefs) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "package_refs", Value: strings.Join(t.PackageRefs, ", ")})
+			}
+			if len(t.Frameworks) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "frameworks", Value: strings.Join(t.Frameworks, ", ")})
+			}
+			if len(t.Libraries) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "libraries", Value: strings.Join(t.Libraries, ", ")})
+			}
+			if len(t.LinkerFlags) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "linker_flags", Value: strings.Join(t.LinkerFlags, " ")})
+			}
+			if len(t.FrameworkSearchPaths) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "framework_search_paths", Value: strings.Join(t.FrameworkSearchPaths, ", ")})
+			}
+			if len(t.LibrarySearchPaths) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "library_search_paths", Value: strings.Join(t.LibrarySearchPaths, ", ")})
+			}
+			if len(t.ShellScriptPhases) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "shell_script_phases", Value: strings.Join(t.ShellScriptPhases, ", ")})
+			}
+			if len(t.CopyFilesPhases) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "copy_files_phases", Value: strings.Join(t.CopyFilesPhases, ", ")})
 			}
 			if t.SourceRoot != "" {
 				targetMap = append(targetMap, output.KV{Key: "source_root", Value: t.SourceRoot})

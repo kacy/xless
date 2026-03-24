@@ -154,8 +154,53 @@ func buildSwiftcArgs(bc *BuildContext, sources []string) []string {
 	// user-specified flags
 	args = append(args, bc.Target.SwiftFlags...)
 
+	for _, moduleDir := range uniqueStrings(bc.PackageModuleDirs) {
+		args = append(args, "-I", moduleDir)
+	}
+	for _, libraryDir := range uniqueStrings(bc.PackageLibraryDirs) {
+		args = append(args, "-L", libraryDir)
+	}
+
+	// link SDK frameworks declared in the Xcode target's frameworks phase.
+	for _, framework := range frameworkLinkNames(bc.Target.Frameworks) {
+		args = append(args, "-framework", framework)
+	}
+	for _, library := range bc.Target.Libraries {
+		args = append(args, "-l"+library)
+	}
+	for _, library := range uniqueStrings(bc.PackageLibraries) {
+		args = append(args, "-l"+library)
+	}
+
 	// output
 	args = append(args, "-emit-executable", "-o", bc.ExecutablePath)
 
 	return args
+}
+
+func frameworkLinkNames(frameworks []string) []string {
+	var names []string
+	for _, framework := range frameworks {
+		base := filepath.Base(framework)
+		if strings.HasSuffix(base, ".framework") {
+			name := strings.TrimSuffix(base, ".framework")
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+	}
+	return uniqueStrings(names)
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]bool)
+	var unique []string
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		unique = append(unique, value)
+	}
+	return unique
 }

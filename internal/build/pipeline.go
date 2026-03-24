@@ -11,18 +11,24 @@ import (
 
 // BuildContext is the mutable state passed through pipeline stages.
 type BuildContext struct {
-	Ctx            context.Context
-	Config         *config.ProjectConfig
-	Target         *config.TargetConfig
-	Toolchain      toolchain.Toolchain
-	Platform       toolchain.Platform
-	BuildConfig    string // "debug" or "release"
-	ProjectDir     string // working directory
-	BuildDir       string // .build/{target_name}/
-	ExecutablePath string // set by compiler
-	AppBundlePath  string // set by bundler
-	IPAPath        string // set by packager (device builds only)
-	Out            output.Formatter
+	Ctx                context.Context
+	Config             *config.ProjectConfig
+	Target             *config.TargetConfig
+	Toolchain          toolchain.Toolchain
+	Platform           toolchain.Platform
+	BuildConfig        string   // "debug" or "release"
+	RootDir            string   // original working directory
+	WorkspaceDir       string   // selected .xcworkspace, if any
+	XcodeprojDir       string   // selected .xcodeproj, if any
+	ProjectDir         string   // working directory
+	BuildDir           string   // .build/{target_name}/
+	PackageModuleDirs  []string // additional -I paths for swift modules
+	PackageLibraryDirs []string // additional -L paths for package static libs
+	PackageLibraries   []string // additional -l inputs for package products
+	ExecutablePath     string   // set by compiler
+	AppBundlePath      string   // set by bundler
+	IPAPath            string   // set by packager (device builds only)
+	Out                output.Formatter
 }
 
 // Stage is a single step in the build pipeline.

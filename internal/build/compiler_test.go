@@ -233,6 +233,70 @@ func TestBuildSwiftcArgsUserFlags(t *testing.T) {
 	assertContainsValue(t, args, "-warn-concurrency")
 }
 
+func TestBuildSwiftcArgsFrameworks(t *testing.T) {
+	bc := &BuildContext{
+		Platform:    toolchain.PlatformSimulator,
+		BuildConfig: "debug",
+		Toolchain:   &mockToolchain{arch: "arm64"},
+		Target: &config.TargetConfig{
+			Name:       "MyApp",
+			MinIOS:     "16.0",
+			Frameworks: []string{"MapKit.framework", "Frameworks/WeatherKit.framework"},
+		},
+		BuildDir: ".build/MyApp",
+	}
+	bc.ExecutablePath = filepath.Join(bc.BuildDir, bc.Target.Name)
+
+	args := buildSwiftcArgs(bc, []string{"main.swift"})
+
+	assertContains(t, args, "-framework", "MapKit")
+	assertContains(t, args, "-framework", "WeatherKit")
+}
+
+func TestBuildSwiftcArgsLibraries(t *testing.T) {
+	bc := &BuildContext{
+		Platform:    toolchain.PlatformSimulator,
+		BuildConfig: "debug",
+		Toolchain:   &mockToolchain{arch: "arm64"},
+		Target: &config.TargetConfig{
+			Name:      "MyApp",
+			MinIOS:    "16.0",
+			Libraries: []string{"sqlite3", "z"},
+		},
+		BuildDir: ".build/MyApp",
+	}
+	bc.ExecutablePath = filepath.Join(bc.BuildDir, bc.Target.Name)
+
+	args := buildSwiftcArgs(bc, []string{"main.swift"})
+
+	assertContainsValue(t, args, "-lsqlite3")
+	assertContainsValue(t, args, "-lz")
+}
+
+func TestBuildSwiftcArgsPackageInputs(t *testing.T) {
+	bc := &BuildContext{
+		Platform:    toolchain.PlatformSimulator,
+		BuildConfig: "debug",
+		Toolchain:   &mockToolchain{arch: "arm64"},
+		Target: &config.TargetConfig{
+			Name:   "MyApp",
+			MinIOS: "16.0",
+		},
+		PackageModuleDirs:  []string{".build/MyApp/packages/modules"},
+		PackageLibraryDirs: []string{".build/MyApp/packages/lib"},
+		PackageLibraries:   []string{"WeatherKitUI", "WeatherCore"},
+		BuildDir:           ".build/MyApp",
+	}
+	bc.ExecutablePath = filepath.Join(bc.BuildDir, bc.Target.Name)
+
+	args := buildSwiftcArgs(bc, []string{"main.swift"})
+
+	assertContains(t, args, "-I", ".build/MyApp/packages/modules")
+	assertContains(t, args, "-L", ".build/MyApp/packages/lib")
+	assertContainsValue(t, args, "-lWeatherKitUI")
+	assertContainsValue(t, args, "-lWeatherCore")
+}
+
 // test helpers
 
 func writeFile(t *testing.T, path, content string) {

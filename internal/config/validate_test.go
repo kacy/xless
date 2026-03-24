@@ -144,7 +144,7 @@ func TestDefaultTarget(t *testing.T) {
 func TestValidateTargetSupport(t *testing.T) {
 	target := &TargetConfig{
 		Name:        "App",
-		Unsupported: []string{"Swift package dependencies: WeatherKit", "non-swift source file AppDelegate.m"},
+		Unsupported: []string{"non-swift source file AppDelegate.m", "shell script build phases: Generate Assets"},
 	}
 
 	err := ValidateTargetSupport(target)
@@ -154,7 +154,7 @@ func TestValidateTargetSupport(t *testing.T) {
 	if !strings.Contains(err.Error(), "unsupported capabilities") {
 		t.Fatalf("error = %q", err)
 	}
-	if !strings.Contains(err.Error(), "WeatherKit") {
+	if !strings.Contains(err.Error(), "Generate Assets") {
 		t.Fatalf("error = %q", err)
 	}
 }

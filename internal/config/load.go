@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kacy/xless/internal/project"
+	"github.com/kacy/xless/internal/swiftpm"
 	"github.com/kacy/xless/internal/workspace"
 	"github.com/kacy/xless/internal/xcodeproj"
 	"gopkg.in/yaml.v3"
@@ -140,6 +141,7 @@ func loadXcodeproj(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 	if ov != nil {
 		det.Warnings = append(det.Warnings, applyOverlay(cfg, ov)...)
 	}
+	loadResolvedPackages(cfg, det, swiftpm.FindResolvedForXcodeproj(det.XcodeprojDir))
 
 	return cfg, nil
 }
@@ -193,6 +195,7 @@ func loadWorkspace(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 	if ov != nil {
 		det.Warnings = append(det.Warnings, applyOverlay(cfg, ov)...)
 	}
+	loadResolvedPackages(cfg, det, swiftpm.FindResolvedForWorkspace(det.WorkspaceDir))
 
 	return cfg, nil
 }
@@ -208,4 +211,37 @@ func applyFlags(cfg *ProjectConfig, flags CLIFlags) {
 	if flags.Device != "" {
 		cfg.Defaults.Device = flags.Device
 	}
+}
+
+func loadResolvedPackages(cfg *ProjectConfig, det *project.DetectResult, resolvedPath string) {
+	if resolvedPath == "" {
+		if projectUsesPackageReferences(cfg) {
+			det.Warnings = append(det.Warnings,
+				"swift package dependencies are referenced but no Package.resolved was found (run `xcodebuild -resolvePackageDependencies` in Xcode-managed projects)")
+		}
+		return
+	}
+
+	resolved, err := swiftpm.ParseResolved(resolvedPath)
+	if err != nil {
+		det.Warnings = append(det.Warnings, fmt.Sprintf("could not parse Package.resolved at %s: %v", resolvedPath, err))
+		return
+	}
+
+	cfg.PackageResolvedFile = resolved.Path
+	cfg.ResolvedPackages = resolved.Packages
+
+	if projectUsesPackageReferences(cfg) && len(cfg.ResolvedPackages) == 0 {
+		det.Warnings = append(det.Warnings,
+			fmt.Sprintf("swift package dependencies are referenced but %s contains no resolved packages", resolvedPath))
+	}
+}
+
+func projectUsesPackageReferences(cfg *ProjectConfig) bool {
+	for _, target := range cfg.Targets {
+		if len(target.Packages) > 0 || len(target.PackageRefs) > 0 {
+			return true
+		}
+	}
+	return false
 }

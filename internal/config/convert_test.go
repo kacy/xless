@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kacy/xless/internal/xcodeproj"
@@ -161,5 +162,127 @@ func TestSplitFlags(t *testing.T) {
 				t.Errorf("splitFlags(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
 			}
 		}
+	}
+}
+
+func TestConvertUnsupportedCapabilities(t *testing.T) {
+	xt := xcodeproj.XcodeTarget{
+		Name:          "ComplexApp",
+		ProductType:   "com.apple.product-type.application",
+		SourceFiles:   []string{"Sources/App.swift", "Legacy/AppDelegate.m"},
+		ResourceFiles: []string{"Assets.xcassets", "Main.storyboard", "Model.xcdatamodeld"},
+		LinkInputs: []xcodeproj.LinkInput{
+			{Path: "MapKit.framework", SourceTree: "SDKROOT"},
+			{Path: "libsqlite3.tbd", SourceTree: "SDKROOT"},
+			{Path: "Vendor/WeatherKit.framework", SourceTree: "<group>"},
+		},
+		PackageProducts: []string{"WeatherKit"},
+		PackageReferences: []string{
+			"remote https://example.com/weatherkit.git",
+		},
+		ShellScriptPhases: []string{"Generate Assets"},
+		CopyFilesPhases:   []string{"Embed Support Files"},
+		Configurations: []xcodeproj.BuildConfig{
+			{
+				Name: "Debug",
+				Settings: map[string]string{
+					"PRODUCT_BUNDLE_IDENTIFIER":  "com.example.ComplexApp",
+					"IPHONEOS_DEPLOYMENT_TARGET": "17.0",
+					"OTHER_LDFLAGS":              "$(inherited) -ObjC -framework MapKit",
+					"FRAMEWORK_SEARCH_PATHS":     "$(inherited) Vendor/Frameworks",
+					"LIBRARY_SEARCH_PATHS":       "Vendor/Libraries",
+					"SWIFT_OBJC_BRIDGING_HEADER": "ComplexApp-Bridging-Header.h",
+				},
+			},
+		},
+	}
+
+	cfg := ConvertXcodeProject(&xcodeproj.XcodeProject{
+		Name:    "ComplexApp",
+		Targets: []xcodeproj.XcodeTarget{xt},
+	}, "debug")
+
+	target := cfg.Targets[0]
+	if len(target.Frameworks) != 1 || target.Frameworks[0] != "MapKit.framework" {
+		t.Fatalf("frameworks = %v", target.Frameworks)
+	}
+	if len(target.Libraries) != 1 || target.Libraries[0] != "sqlite3" {
+		t.Fatalf("libraries = %v", target.Libraries)
+	}
+	if len(target.LinkerFlags) != 1 || target.LinkerFlags[0] != "-ObjC" {
+		t.Fatalf("linker flags = %v", target.LinkerFlags)
+	}
+	if len(target.FrameworkSearchPaths) != 1 || target.FrameworkSearchPaths[0] != "Vendor/Frameworks" {
+		t.Fatalf("framework search paths = %v", target.FrameworkSearchPaths)
+	}
+	if len(target.LibrarySearchPaths) != 1 || target.LibrarySearchPaths[0] != "Vendor/Libraries" {
+		t.Fatalf("library search paths = %v", target.LibrarySearchPaths)
+	}
+	if len(target.PackageRefs) != 1 || target.PackageRefs[0] != "remote https://example.com/weatherkit.git" {
+		t.Fatalf("package refs = %v", target.PackageRefs)
+	}
+
+	unsupported := strings.Join(target.Unsupported, "\n")
+	for _, want := range []string{
+		"non-swift source file Legacy/AppDelegate.m",
+		"asset catalog resource Assets.xcassets",
+		"Interface Builder resource Main.storyboard",
+		"Core Data model resource Model.xcdatamodeld",
+		"Objective-C bridging header ComplexApp-Bridging-Header.h",
+		"non-SDK framework dependency Vendor/WeatherKit.framework",
+		"custom linker flags: -ObjC",
+		"framework search paths: Vendor/Frameworks",
+		"library search paths: Vendor/Libraries",
+		"shell script build phases: Generate Assets",
+		"copy files build phases: Embed Support Files",
+	} {
+		if !strings.Contains(unsupported, want) {
+			t.Fatalf("unsupported = %q, want %q", unsupported, want)
+		}
+	}
+}
+
+func TestSplitBuildSettingList(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"", nil},
+		{"$(inherited) Vendor/Frameworks Vendor/More", []string{"Vendor/Frameworks", "Vendor/More"}},
+		{"-ObjC -framework MapKit", []string{"-ObjC", "-framework", "MapKit"}},
+	}
+
+	for _, tt := range tests {
+		got := splitBuildSettingList(tt.input)
+		if len(got) != len(tt.want) {
+			t.Fatalf("splitBuildSettingList(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Fatalf("splitBuildSettingList(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestClassifyLinkerFlags(t *testing.T) {
+	frameworks, unsupported := classifyLinkerFlags([]string{"-framework", "MapKit", "-ObjC", "-framework", "StoreKit"})
+
+	if len(frameworks) != 2 || frameworks[0] != "MapKit.framework" || frameworks[1] != "StoreKit.framework" {
+		t.Fatalf("frameworks = %v", frameworks)
+	}
+	if len(unsupported) != 1 || unsupported[0] != "-ObjC" {
+		t.Fatalf("unsupported = %v", unsupported)
+	}
+}
+
+func TestClassifyLibraryFlags(t *testing.T) {
+	libraries, unsupported := classifyLibraryFlags([]string{"-lsqlite3", "-l", "z", "-ObjC"})
+
+	if len(libraries) != 2 || libraries[0] != "sqlite3" || libraries[1] != "z" {
+		t.Fatalf("libraries = %v", libraries)
+	}
+	if len(unsupported) != 1 || unsupported[0] != "-ObjC" {
+		t.Fatalf("unsupported = %v", unsupported)
 	}
 }

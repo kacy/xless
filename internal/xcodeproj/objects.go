@@ -21,13 +21,24 @@ type XcodeProject struct {
 
 // XcodeTarget is a resolved native target.
 type XcodeTarget struct {
-	Name            string
-	ProductType     string // e.g. "com.apple.product-type.application"
-	Configurations  []BuildConfig
-	SourceFiles     []string // relative paths
-	ResourceFiles   []string // relative paths
-	Dependencies    []string // target names this target depends on
-	PackageProducts []string
+	Name              string
+	ProductType       string // e.g. "com.apple.product-type.application"
+	Configurations    []BuildConfig
+	SourceFiles       []string // relative paths
+	ResourceFiles     []string // relative paths
+	FrameworkFiles    []string // relative paths
+	LinkInputs        []LinkInput
+	Dependencies      []string // target names this target depends on
+	PackageProducts   []string
+	PackageReferences []string
+	ShellScriptPhases []string
+	CopyFilesPhases   []string
+}
+
+// LinkInput is a file referenced from PBXFrameworksBuildPhase.
+type LinkInput struct {
+	Path       string
+	SourceTree string
 }
 
 // BuildConfig holds resolved build settings for a named configuration.
@@ -44,11 +55,16 @@ const (
 	isaXCBuildConfiguration            = "XCBuildConfiguration"
 	isaPBXSourcesBuildPhase            = "PBXSourcesBuildPhase"
 	isaPBXResourcesBuildPhase          = "PBXResourcesBuildPhase"
+	isaPBXFrameworksBuildPhase         = "PBXFrameworksBuildPhase"
+	isaPBXShellScriptBuildPhase        = "PBXShellScriptBuildPhase"
+	isaPBXCopyFilesBuildPhase          = "PBXCopyFilesBuildPhase"
 	isaPBXBuildFile                    = "PBXBuildFile"
 	isaPBXFileReference                = "PBXFileReference"
 	isaPBXGroup                        = "PBXGroup"
 	isaPBXTargetDependency             = "PBXTargetDependency"
 	isaXCSwiftPackageProductDependency = "XCSwiftPackageProductDependency"
+	isaXCRemoteSwiftPackageReference   = "XCRemoteSwiftPackageReference"
+	isaXCLocalSwiftPackageReference    = "XCLocalSwiftPackageReference"
 )
 
 // common Xcode product types

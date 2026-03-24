@@ -2,12 +2,16 @@
 // Both xcodeproj and xless-native projects resolve to the same types.
 package config
 
+import "github.com/kacy/xless/internal/swiftpm"
+
 // ProjectConfig is the unified configuration for an xless project.
 // The build pipeline receives this and never knows which source produced it.
 type ProjectConfig struct {
-	Project  ProjectInfo    `yaml:"project"`
-	Targets  []TargetConfig `yaml:"targets"`
-	Defaults DefaultsConfig `yaml:"defaults"`
+	Project             ProjectInfo               `yaml:"project"`
+	Targets             []TargetConfig            `yaml:"targets"`
+	Defaults            DefaultsConfig            `yaml:"defaults"`
+	ResolvedPackages    []swiftpm.ResolvedPackage `yaml:"-"`
+	PackageResolvedFile string                    `yaml:"-"`
 }
 
 // ProjectInfo holds top-level project metadata.
@@ -17,21 +21,29 @@ type ProjectInfo struct {
 
 // TargetConfig describes a single build target (app, extension, test, framework).
 type TargetConfig struct {
-	Name         string        `yaml:"name"`
-	BundleID     string        `yaml:"bundle_id"`
-	ProductType  ProductType   `yaml:"product_type"`
-	Sources      []string      `yaml:"sources"`
-	Resources    []string      `yaml:"resources"`
-	MinIOS       string        `yaml:"min_ios"`
-	SwiftFlags   []string      `yaml:"swift_flags"`
-	Signing      SigningConfig `yaml:"signing"`
-	InfoPlist    string        `yaml:"info_plist"`
-	Version      string        `yaml:"version"`
-	BuildNum     string        `yaml:"build_number"`
-	Dependencies []string      `yaml:"dependencies"`
-	SourceRoot   string        `yaml:"-"`
-	Packages     []string      `yaml:"-"`
-	Unsupported  []string      `yaml:"-"`
+	Name                 string        `yaml:"name"`
+	BundleID             string        `yaml:"bundle_id"`
+	ProductType          ProductType   `yaml:"product_type"`
+	Sources              []string      `yaml:"sources"`
+	Resources            []string      `yaml:"resources"`
+	MinIOS               string        `yaml:"min_ios"`
+	SwiftFlags           []string      `yaml:"swift_flags"`
+	Signing              SigningConfig `yaml:"signing"`
+	InfoPlist            string        `yaml:"info_plist"`
+	Version              string        `yaml:"version"`
+	BuildNum             string        `yaml:"build_number"`
+	Dependencies         []string      `yaml:"dependencies"`
+	SourceRoot           string        `yaml:"-"`
+	Packages             []string      `yaml:"-"`
+	PackageRefs          []string      `yaml:"-"`
+	Frameworks           []string      `yaml:"-"`
+	Libraries            []string      `yaml:"-"`
+	LinkerFlags          []string      `yaml:"-"`
+	FrameworkSearchPaths []string      `yaml:"-"`
+	LibrarySearchPaths   []string      `yaml:"-"`
+	ShellScriptPhases    []string      `yaml:"-"`
+	CopyFilesPhases      []string      `yaml:"-"`
+	Unsupported          []string      `yaml:"-"`
 }
 
 // SigningConfig holds code signing settings.
