@@ -95,6 +95,74 @@ func findByName(sims []SimulatorInfo, name string) Device {
 	return nil
 }
 
+// ResolvePhysicalDevice finds a physical device by specifier, falling back to defaults and auto-detection.
+// Resolution order:
+//  1. specifier matches UDID → match by UDID
+//  2. specifier is non-empty → match by name (case-insensitive)
+//  3. specifier empty, try defaultName → match by name
+//  4. first connected device
+func ResolvePhysicalDevice(ctx context.Context, specifier, defaultName string) (Device, error) {
+	devices, err := ListPhysicalDevices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolvePhysicalFromList(devices, specifier, defaultName)
+}
+
+// resolvePhysicalFromList is the testable core of ResolvePhysicalDevice.
+func resolvePhysicalFromList(devices []PhysicalDeviceInfo, specifier, defaultName string) (Device, error) {
+	if len(devices) == 0 {
+		return nil, &DeviceError{
+			Op:   "resolve",
+			Err:  fmt.Errorf("no physical devices found"),
+			Hint: "connect an ios device via usb or ensure it's on the same network",
+		}
+	}
+
+	// 1. match by UDID
+	if specifier != "" {
+		for _, d := range devices {
+			if strings.EqualFold(d.UDID, specifier) {
+				return NewPhysicalDevice(d), nil
+			}
+		}
+
+		// 2. match by name (case-insensitive)
+		for _, d := range devices {
+			if strings.EqualFold(d.Name, specifier) {
+				return NewPhysicalDevice(d), nil
+			}
+		}
+
+		return nil, &DeviceError{
+			Op:   "resolve",
+			Err:  fmt.Errorf("no physical device matching %q", specifier),
+			Hint: "run `xless devices --physical` to see connected devices",
+		}
+	}
+
+	// 3. try defaultName from config
+	if defaultName != "" {
+		for _, d := range devices {
+			if strings.EqualFold(d.Name, defaultName) {
+				return NewPhysicalDevice(d), nil
+			}
+		}
+		// fall through to auto-detection
+	}
+
+	// 4. first connected device
+	for _, d := range devices {
+		if d.Connected {
+			return NewPhysicalDevice(d), nil
+		}
+	}
+
+	// 5. first device at all
+	return NewPhysicalDevice(devices[0]), nil
+}
+
 // looksLikeUDID returns true if s resembles a UUID (36 chars, 4 hyphens).
 func looksLikeUDID(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4

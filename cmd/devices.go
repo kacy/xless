@@ -3,6 +3,7 @@ package cmd
 import (
 	"cmp"
 	"slices"
+	"sync"
 
 	"github.com/kacyfortner/ios-build-cli/internal/device"
 	"github.com/kacyfortner/ios-build-cli/internal/output"
@@ -11,58 +12,126 @@ import (
 
 func init() {
 	devicesCmd.Flags().Bool("booted", false, "show only booted simulators")
-	devicesCmd.Flags().Bool("physical", false, "show physical devices")
+	devicesCmd.Flags().Bool("physical", false, "show only physical devices")
+	devicesCmd.Flags().Bool("simulators", false, "show only simulators")
 	rootCmd.AddCommand(devicesCmd)
 }
 
 var devicesCmd = &cobra.Command{
 	Use:   "devices",
 	Short: "list available simulators and devices",
-	Long:  "lists ios simulators available for deployment. use --booted to show only running simulators.",
+	Long:  "lists ios simulators and physical devices available for deployment.",
 	Run: func(cmd *cobra.Command, args []string) {
 		physical, _ := cmd.Flags().GetBool("physical")
-		if physical {
-			out.Warn("physical device listing is not yet supported")
-			return
-		}
-
+		simulators, _ := cmd.Flags().GetBool("simulators")
 		booted, _ := cmd.Flags().GetBool("booted")
 
-		sims, err := device.ListSimulators(cmd.Context())
-		if err != nil {
-			out.Error(err.Error())
+		// when neither flag set, show both
+		showSimulators := !physical || simulators
+		showPhysical := !simulators || physical
+
+		// if both flags explicitly set, show both
+		if physical && simulators {
+			showSimulators = true
+			showPhysical = true
+		}
+
+		if showSimulators && showPhysical {
+			// fetch both concurrently, print sequentially
+			var wg sync.WaitGroup
+			var sims []device.SimulatorInfo
+			var simsErr error
+			var devs []device.PhysicalDeviceInfo
+			var devsErr error
+
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				sims, simsErr = device.ListSimulators(cmd.Context())
+			}()
+			go func() {
+				defer wg.Done()
+				devs, devsErr = device.ListPhysicalDevices(cmd.Context())
+			}()
+			wg.Wait()
+
+			printSimulators(sims, simsErr, booted)
+			printPhysicalDevices(devs, devsErr)
 			return
 		}
 
-		if booted {
-			var filtered []device.SimulatorInfo
-			for _, s := range sims {
-				if s.State == device.StateBooted {
-					filtered = append(filtered, s)
-				}
-			}
-			sims = filtered
+		if showSimulators {
+			sims, err := device.ListSimulators(cmd.Context())
+			printSimulators(sims, err, booted)
 		}
 
-		if len(sims) == 0 {
-			out.Info("no simulators found")
-			return
-		}
-
-		// group by runtime for human output
-		groups := groupByRuntime(sims)
-		for _, g := range groups {
-			out.Info(g.runtime, "count", len(g.sims))
-			for _, s := range g.sims {
-				out.Data("simulator", output.OrderedMap{
-					{Key: "name", Value: s.Name},
-					{Key: "udid", Value: s.UDID},
-					{Key: "state", Value: s.State},
-					{Key: "runtime", Value: s.Runtime},
-				})
-			}
+		if showPhysical {
+			devs, err := device.ListPhysicalDevices(cmd.Context())
+			printPhysicalDevices(devs, err)
 		}
 	},
+}
+
+func printSimulators(sims []device.SimulatorInfo, err error, booted bool) {
+	if err != nil {
+		out.Error(err.Error())
+		return
+	}
+
+	if booted {
+		var filtered []device.SimulatorInfo
+		for _, s := range sims {
+			if s.State == device.StateBooted {
+				filtered = append(filtered, s)
+			}
+		}
+		sims = filtered
+	}
+
+	if len(sims) == 0 {
+		out.Info("no simulators found")
+		return
+	}
+
+	groups := groupByRuntime(sims)
+	for _, g := range groups {
+		out.Info(g.runtime, "count", len(g.sims))
+		for _, s := range g.sims {
+			out.Data("simulator", output.OrderedMap{
+				{Key: "name", Value: s.Name},
+				{Key: "udid", Value: s.UDID},
+				{Key: "state", Value: s.State},
+				{Key: "runtime", Value: s.Runtime},
+			})
+		}
+	}
+}
+
+func printPhysicalDevices(devices []device.PhysicalDeviceInfo, err error) {
+	if err != nil {
+		out.Warn("could not list physical devices: " + err.Error())
+		return
+	}
+
+	if len(devices) == 0 {
+		out.Info("no physical devices found")
+		return
+	}
+
+	out.Info("physical devices", "count", len(devices))
+	for _, d := range devices {
+		state := "disconnected"
+		if d.Connected {
+			state = "connected"
+		}
+		out.Data("device", output.OrderedMap{
+			{Key: "name", Value: d.Name},
+			{Key: "udid", Value: d.UDID},
+			{Key: "type", Value: d.DeviceType},
+			{Key: "transport", Value: d.TransportType},
+			{Key: "state", Value: state},
+		})
+	}
 }
 
 type runtimeGroup struct {

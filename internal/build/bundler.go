@@ -66,10 +66,7 @@ func writeInfoPlist(bc *BuildContext, appDir string) error {
 
 	// if target specifies an existing plist, copy it
 	if bc.Target.InfoPlist != "" {
-		src := bc.Target.InfoPlist
-		if !filepath.IsAbs(src) {
-			src = filepath.Join(bc.ProjectDir, src)
-		}
+		src := resolveProjectPath(bc.ProjectDir, bc.Target.InfoPlist)
 		if err := copyFile(src, plistPath); err != nil {
 			return &BuildError{
 				Stage: "bundle",
@@ -123,10 +120,7 @@ func writeInfoPlist(bc *BuildContext, appDir string) error {
 // copyResources copies resource files and directories into the app bundle.
 func copyResources(bc *BuildContext, appDir string) error {
 	for _, res := range bc.Target.Resources {
-		src := res
-		if !filepath.IsAbs(src) {
-			src = filepath.Join(bc.ProjectDir, src)
-		}
+		src := resolveProjectPath(bc.ProjectDir, res)
 
 		info, err := os.Stat(src)
 		if err != nil {

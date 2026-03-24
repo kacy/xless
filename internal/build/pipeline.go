@@ -21,6 +21,7 @@ type BuildContext struct {
 	BuildDir       string // .build/{target_name}/
 	ExecutablePath string // set by compiler
 	AppBundlePath  string // set by bundler
+	IPAPath        string // set by packager (device builds only)
 	Out            output.Formatter
 }
 

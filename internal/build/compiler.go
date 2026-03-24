@@ -62,7 +62,7 @@ func (CompileStage) Run(bc *BuildContext) error {
 		}
 		detail := fmt.Errorf("swiftc failed: %w", err)
 		if stderr != "" {
-			detail = fmt.Errorf("swiftc failed:\n%s", stderr)
+			detail = fmt.Errorf("swiftc failed:\n%s: %w", stderr, err)
 		}
 		return &BuildError{
 			Stage: "compile",
@@ -82,10 +82,7 @@ func resolveSwiftFiles(projectDir string, sources []string) ([]string, error) {
 	var files []string
 
 	for _, src := range sources {
-		abs := src
-		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(projectDir, abs)
-		}
+		abs := resolveProjectPath(projectDir, src)
 
 		info, err := os.Stat(abs)
 		if err != nil {

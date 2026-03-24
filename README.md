@@ -9,7 +9,7 @@ xless drives the apple toolchain directly — `swiftc`, `simctl`, `devicectl`, `
 ## install
 
 ```sh
-# homebrew (coming soon)
+# homebrew
 brew install kacy/tap/xless
 
 # or grab the latest binary
@@ -34,14 +34,14 @@ xless run           # build and launch in simulator
 
 | command | description |
 |---|---|
-| `xless info` | display resolved project configuration |
 | `xless version` | print cli and toolchain versions |
-| `xless init` | scaffold a new project *(coming soon)* |
+| `xless info` | display resolved project configuration |
+| `xless init [name]` | scaffold a new project |
 | `xless build` | compile and bundle an ios app |
-| `xless run` | build, install, and launch *(coming soon)* |
-| `xless devices` | list simulators and physical devices *(coming soon)* |
-| `xless logs` | stream app logs *(coming soon)* |
-| `xless clean` | remove build artifacts *(coming soon)* |
+| `xless run` | build, install, and launch on simulator or device |
+| `xless devices` | list simulators and physical devices |
+| `xless logs` | stream app logs from a simulator |
+| `xless clean` | remove build artifacts |
 
 every command supports `--json` for structured output, making it easy for scripts and llms to work with.
 
@@ -54,6 +54,23 @@ xless auto-detects your project type:
 | `.xcodeproj` + `xless.yml` | reads xcodeproj as source of truth, applies xless.yml as overlay |
 | `.xcodeproj` only | reads xcodeproj directly — zero config |
 | `xless.yml` only | uses xless.yml as the full config (native mode) |
+
+### project scaffolding
+
+```sh
+# simple swift project (default)
+xless init myapp
+
+# swift package manager project
+xless init myapp --template spm
+
+# custom bundle id and deployment target
+xless init myapp --bundle-id com.mycompany.myapp --min-ios 17.0
+```
+
+the simple template creates a minimal SwiftUI app with `xless.yml`. the spm template adds a `Package.swift` manifest.
+
+> note: the build pipeline currently supports `type: "simple"` only. spm support is planned.
 
 ### xcodeproj support
 
@@ -73,10 +90,6 @@ $ xless info
     product_type  app
     min_ios       17.0
     ...
-  target:MyWidget:
-    name          MyWidget
-    product_type  app-extension
-    ...
 ```
 
 multi-target projects work out of the box. use `--target` to select which one to build:
@@ -87,7 +100,7 @@ xless build --target MyWidget
 
 ### building
 
-`xless build` compiles swift sources, creates a `.app` bundle with `Info.plist`, and ad-hoc signs for the simulator:
+`xless build` compiles swift sources, creates a `.app` bundle with `Info.plist`, and signs for the target platform:
 
 ```sh
 $ xless build
@@ -95,17 +108,79 @@ $ xless build
   info  compile files=3
   info  bundle path=.build/MyApp/MyApp.app
   info  sign identity=-
-  ok    build complete bundle=.build/MyApp/MyApp.app time=1.2s
+  ok    build complete output=.build/MyApp/MyApp.app time=1.2s
 ```
 
-use `--build-config release` for an optimized build, or `--platform device` for a device build (requires signing identity):
+use `--build-config release` for an optimized build, or `--platform device` for a device build:
 
 ```sh
 xless build --build-config release
 xless build --platform device
 ```
 
-the build pipeline runs three stages in order: **compile** (swiftc), **bundle** (.app creation + Info.plist), and **sign** (codesign). if any stage fails, you get an error with a hint on what to fix.
+the build pipeline runs stages in order: **compile** (swiftc), **bundle** (.app creation + Info.plist), **sign** (codesign), and **package** (IPA, device builds only). if any stage fails, you get an error with a hint on what to fix.
+
+### running
+
+```sh
+# simulator (default)
+xless run
+
+# physical device
+xless run --platform device
+
+# with log streaming
+xless run --logs
+```
+
+### device management
+
+```sh
+# list everything
+xless devices
+
+# simulators only
+xless devices --simulators
+
+# physical devices only
+xless devices --physical
+
+# only booted simulators
+xless devices --booted
+```
+
+### log streaming
+
+```sh
+# stream logs from default simulator
+xless logs
+
+# filter by keyword
+xless logs --filter "error"
+
+# explicit bundle id
+xless logs --bundle-id com.example.MyApp
+```
+
+### cleaning
+
+```sh
+xless clean
+```
+
+### device builds
+
+device builds require a signing identity, provisioning profile, and optionally entitlements. configure these in `xless.yml`:
+
+```yaml
+signing:
+  identity: "Apple Development: you@example.com"
+  provisioning_profile: "path/to/profile.mobileprovision"
+  entitlements: "path/to/entitlements.plist"
+  team_id: "YOUR_TEAM_ID"
+```
+
+the device build pipeline produces an IPA (`.ipa`) file that gets installed via `devicectl`.
 
 ### xless.yml overlay
 
@@ -154,6 +229,7 @@ defaults:
 --platform      simulator or device
 --target        build target name
 --build-config  debug or release
+--device        device name or UDID
 --verbose       enable verbose output
 --no-color      disable colored output
 ```
@@ -166,15 +242,16 @@ every command supports `--json` for machine-readable output:
 $ xless info --json
 {"type":"data","message":"project","data":{"name":"MyApp","mode":"xcodeproj","targets":"3"}}
 {"type":"data","message":"target:MyApp","data":{"name":"MyApp","bundle_id":"com.example.MyApp",...}}
-{"type":"data","message":"defaults","data":{"config":"debug","simulator":"iPhone 16 Pro"}}
 
 $ xless build --json
 {"type":"info","message":"build","data":{"target":"MyApp","platform":"simulator","config":"debug"}}
 {"type":"info","message":"compile","data":{"files":"3"}}
-{"type":"info","message":"bundle","data":{"path":".build/MyApp/MyApp.app"}}
-{"type":"info","message":"sign","data":{"identity":"-"}}
-{"type":"success","message":"build complete","data":{"bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
+{"type":"success","message":"build complete","data":{"output":".build/MyApp/MyApp.app","time":"1.2s"}}
 {"type":"data","message":"build","data":{"target":"MyApp","bundle_id":"com.example.MyApp","platform":"simulator","config":"debug","bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
+
+$ xless devices --json
+{"type":"data","message":"simulator","data":{"name":"iPhone 16 Pro","udid":"...","state":"Booted","runtime":"iOS 18.2"}}
+{"type":"data","message":"device","data":{"name":"Kacy's iPhone","udid":"...","type":"iPhone","transport":"wired","state":"connected"}}
 ```
 
 ## config resolution order

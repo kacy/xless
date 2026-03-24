@@ -145,6 +145,102 @@ func TestResolveEmptyList(t *testing.T) {
 	}
 }
 
+// --- physical device resolution tests ---
+
+var testPhysicalDevices = []PhysicalDeviceInfo{
+	{Name: "Kacy's iPhone", UDID: "00008101-0012345A6789001E", DeviceType: "iPhone", OSVersion: "iOS", TransportType: "wired", Connected: true},
+	{Name: "Kacy's iPad", UDID: "00008103-0012345A6789002F", DeviceType: "iPad", OSVersion: "iOS", TransportType: "localNetwork", Connected: false},
+}
+
+func TestResolvePhysicalByUDID(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "00008101-0012345A6789001E", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone, got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalByName(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "Kacy's iPad", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPad" {
+		t.Errorf("expected Kacy's iPad, got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalByNameCaseInsensitive(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "kacy's iphone", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone, got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalNotFound(t *testing.T) {
+	_, err := resolvePhysicalFromList(testPhysicalDevices, "Galaxy S99", "")
+	if err == nil {
+		t.Fatal("expected error for unknown device")
+	}
+	de, ok := err.(*DeviceError)
+	if !ok {
+		t.Fatalf("expected DeviceError, got %T", err)
+	}
+	if de.Op != "resolve" {
+		t.Errorf("expected op=resolve, got %s", de.Op)
+	}
+}
+
+func TestResolvePhysicalDefault(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "", "Kacy's iPad")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPad" {
+		t.Errorf("expected Kacy's iPad, got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalAutoPreferConnected(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone (connected), got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalEmptyList(t *testing.T) {
+	_, err := resolvePhysicalFromList(nil, "", "")
+	if err == nil {
+		t.Fatal("expected error for empty list")
+	}
+	de, ok := err.(*DeviceError)
+	if !ok {
+		t.Fatalf("expected DeviceError, got %T", err)
+	}
+	if de.Op != "resolve" {
+		t.Errorf("expected op=resolve, got %s", de.Op)
+	}
+}
+
+func TestResolvePhysicalDefaultFallsThrough(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "", "Nonexistent Device")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should fall through to first connected
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone (connected fallback), got %s", d.Name())
+	}
+}
+
 func TestLooksLikeUDID(t *testing.T) {
 	tests := []struct {
 		input string

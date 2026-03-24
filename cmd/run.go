@@ -16,22 +16,12 @@ func init() {
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "build, install, and launch on a simulator",
-	Long:  "compiles the app, installs it on a simulator, and launches it. equivalent to build + install + launch.",
+	Short: "build, install, and launch on a simulator or device",
+	Long:  "compiles the app, installs it on a simulator or device, and launches it. equivalent to build + install + launch.",
 	Run: func(cmd *cobra.Command, args []string) {
 		start := time.Now()
 
-		logs, _ := cmd.Flags().GetBool("logs")
-		if logs {
-			out.Warn("log streaming is not yet supported")
-		}
-
 		flags := cliFlags()
-		if flags.Platform == string(toolchain.PlatformDevice) {
-			out.Error("device deployment is not yet supported",
-				"hint", "use `--platform simulator` or omit the flag")
-			return
-		}
 
 		// build phase
 		bc, cfg, ok := buildApp(cmd)
@@ -41,10 +31,17 @@ var runCmd = &cobra.Command{
 
 		out.Success("build complete", "bundle", bc.AppBundlePath)
 
-		// deploy phase
-		out.Info("resolving simulator")
+		// deploy phase — use bc.Platform which was already resolved during build
+		var dev device.Device
+		var err error
 
-		dev, err := device.ResolveSimulator(cmd.Context(), flags.Device, cfg.Defaults.Simulator)
+		if bc.Platform == toolchain.PlatformDevice {
+			out.Info("resolving device")
+			dev, err = device.ResolvePhysicalDevice(cmd.Context(), flags.Device, cfg.Defaults.Device)
+		} else {
+			out.Info("resolving simulator")
+			dev, err = device.ResolveSimulator(cmd.Context(), flags.Device, cfg.Defaults.Simulator)
+		}
 		if err != nil {
 			out.Error(err.Error())
 			return
@@ -89,5 +86,15 @@ var runCmd = &cobra.Command{
 			{Key: "pid", Value: pid},
 			{Key: "time", Value: elapsed.Round(time.Millisecond).String()},
 		})
+
+		// stream logs if requested
+		logs, _ := cmd.Flags().GetBool("logs")
+		if logs {
+			if bc.Platform == toolchain.PlatformDevice {
+				out.Warn("log streaming is not yet supported for physical devices")
+				return
+			}
+			streamLogs(cmd, dev.UDID(), bc.Target.BundleID, "")
+		}
 	},
 }

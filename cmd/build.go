@@ -31,16 +31,25 @@ var buildCmd = &cobra.Command{
 
 		elapsed := time.Since(start)
 		_ = cfg // used only by run for deploy phase
-		out.Success("build complete", "bundle", bc.AppBundlePath, "time", elapsed.Round(time.Millisecond).String())
 
-		out.Data("build", output.OrderedMap{
+		artifact := bc.AppBundlePath
+		if bc.IPAPath != "" {
+			artifact = bc.IPAPath
+		}
+		out.Success("build complete", "output", artifact, "time", elapsed.Round(time.Millisecond).String())
+
+		data := output.OrderedMap{
 			{Key: "target", Value: bc.Target.Name},
 			{Key: "bundle_id", Value: bc.Target.BundleID},
 			{Key: "platform", Value: string(bc.Platform)},
 			{Key: "config", Value: bc.BuildConfig},
 			{Key: "bundle", Value: bc.AppBundlePath},
-			{Key: "time", Value: elapsed.Round(time.Millisecond).String()},
-		})
+		}
+		if bc.IPAPath != "" {
+			data = append(data, output.KV{Key: "ipa", Value: bc.IPAPath})
+		}
+		data = append(data, output.KV{Key: "time", Value: elapsed.Round(time.Millisecond).String()})
+		out.Data("build", data)
 	},
 }
 
@@ -89,11 +98,15 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 
 	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig)
 
-	pipeline := build.NewPipeline(
+	stages := []build.Stage{
 		build.CompileStage{},
 		build.BundleStage{},
 		build.SignStage{},
-	)
+	}
+	if platform == toolchain.PlatformDevice {
+		stages = append(stages, build.PackageStage{})
+	}
+	pipeline := build.NewPipeline(stages...)
 
 	if err := pipeline.Run(bc); err != nil {
 		out.Error(err.Error())

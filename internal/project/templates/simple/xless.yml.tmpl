@@ -1,0 +1,17 @@
+project:
+  name: "{{.Name}}"
+  bundle_id: "{{.BundleID}}"
+  version: "1.0.0"
+  build_number: "1"
+
+build:
+  type: "simple"
+  sources: ["Sources/{{.Name}}/"]
+  min_ios: "{{.MinIOS}}"
+
+signing:
+  identity: ""
+
+defaults:
+  config: "debug"
+  simulator: "iPhone 16 Pro"
