@@ -9,7 +9,7 @@ import (
 
 // overlayYAML maps the xless.yml schema used in xcodeproj overlay mode.
 type overlayYAML struct {
-	Defaults DefaultsConfig `yaml:"defaults"`
+	Defaults  DefaultsConfig `yaml:"defaults"`
 	Overrides struct {
 		Targets map[string]targetOverride `yaml:"targets"`
 	} `yaml:"overrides"`
@@ -19,8 +19,8 @@ type overlayYAML struct {
 // xcodeproj-derived config.
 type targetOverride struct {
 	Signing    *SigningConfig `yaml:"signing"`
-	SwiftFlags []string      `yaml:"swift_flags"`
-	MinIOS     string        `yaml:"min_ios"`
+	SwiftFlags []string       `yaml:"swift_flags"`
+	MinIOS     string         `yaml:"min_ios"`
 }
 
 // ApplyOverlay reads an xless.yml overlay file and merges it into cfg.

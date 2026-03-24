@@ -33,10 +33,10 @@ type TargetConfig struct {
 
 // SigningConfig holds code signing settings.
 type SigningConfig struct {
-	Identity              string `yaml:"identity"`
-	ProvisioningProfile   string `yaml:"provisioning_profile"`
-	Entitlements          string `yaml:"entitlements"`
-	TeamID                string `yaml:"team_id"`
+	Identity            string `yaml:"identity"`
+	ProvisioningProfile string `yaml:"provisioning_profile"`
+	Entitlements        string `yaml:"entitlements"`
+	TeamID              string `yaml:"team_id"`
 }
 
 // DefaultsConfig holds user preferences for target/config/device selection.

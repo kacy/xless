@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -57,21 +55,16 @@ var buildCmd = &cobra.Command{
 // returns the build context, loaded config, and true on success.
 // on failure, errors are printed to out and false is returned.
 func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, bool) {
-	dir, err := os.Getwd()
-	if err != nil {
-		out.Error("cannot determine working directory", "error", err.Error())
-		return nil, nil, false
-	}
-
 	flags := cliFlags()
-	cfg, _, err := config.Load(dir, flags)
+	dir, cfg, _, err := loadProject(flags)
 	if err != nil {
 		out.Error(err.Error())
 		return nil, nil, false
 	}
 
-	target := resolveTarget(cfg, flags)
-	if target == nil {
+	target, err := selectedTarget(cfg, flags)
+	if err != nil {
+		printTargetSelectionError(err)
 		return nil, nil, false
 	}
 
@@ -116,25 +109,6 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 	return bc, cfg, true
 }
 
-// resolveTarget picks the target from flags or config defaults.
-func resolveTarget(cfg *config.ProjectConfig, flags config.CLIFlags) *config.TargetConfig {
-	if flags.Target != "" {
-		t := cfg.FindTarget(flags.Target)
-		if t == nil {
-			out.Error(fmt.Sprintf("target %q not found", flags.Target),
-				"hint", "run `xless info` to see available targets")
-			return nil
-		}
-		return t
-	}
-	t := cfg.DefaultTarget()
-	if t == nil {
-		out.Error("no targets found in project configuration")
-		return nil
-	}
-	return t
-}
-
 // resolvePlatform returns the platform from flags or defaults to simulator.
 func resolvePlatform(flags config.CLIFlags) toolchain.Platform {
 	if flags.Platform == string(toolchain.PlatformDevice) {
@@ -145,8 +119,8 @@ func resolvePlatform(flags config.CLIFlags) toolchain.Platform {
 
 // resolveBuildConfig returns the build config from flags or config defaults.
 func resolveBuildConfig(flags config.CLIFlags, cfg *config.ProjectConfig) string {
-	if flags.Config != "" {
-		return flags.Config
+	if flags.BuildConfig != "" {
+		return flags.BuildConfig
 	}
 	if cfg.Defaults.Config != "" {
 		return cfg.Defaults.Config

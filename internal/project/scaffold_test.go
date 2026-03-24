@@ -18,12 +18,12 @@ func TestValidateName(t *testing.T) {
 		{"app123", false},
 		{"A", false},
 		{"", true},
-		{"123app", true},       // starts with digit
-		{"-app", true},         // starts with hyphen
-		{"_app", true},         // starts with underscore
-		{"my app", true},       // contains space
-		{"my.app", true},       // contains dot
-		{strings.Repeat("a", 65), true}, // too long
+		{"123app", true},                 // starts with digit
+		{"-app", true},                   // starts with hyphen
+		{"_app", true},                   // starts with underscore
+		{"my app", true},                 // contains space
+		{"my.app", true},                 // contains dot
+		{strings.Repeat("a", 65), true},  // too long
 		{strings.Repeat("a", 64), false}, // max length
 	}
 

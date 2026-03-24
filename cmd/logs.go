@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"github.com/kacy/xless/internal/config"
 	"github.com/kacy/xless/internal/device"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,24 +27,25 @@ var logsCmd = &cobra.Command{
 		filter, _ := cmd.Flags().GetString("filter")
 		bundleID, _ := cmd.Flags().GetString("bundle-id")
 		flags := cliFlags()
+		defaultSimulator := ""
 
-		// resolve bundle ID from config if not provided
-		if bundleID == "" {
-			dir, err := os.Getwd()
-			if err != nil {
-				out.Error("cannot determine working directory", "error", err.Error())
+		_, cfg, _, err := loadProject(flags)
+		if err == nil {
+			defaultSimulator = cfg.Defaults.Simulator
+
+			target, targetErr := selectedTarget(cfg, flags)
+			if targetErr != nil {
+				printTargetSelectionError(targetErr)
 				return
 			}
-			cfg, _, err := config.Load(dir, flags)
-			if err != nil {
-				out.Error("cannot load config for bundle id", "error", err.Error(),
-					"hint", "use --bundle-id to specify the bundle identifier directly")
-				return
-			}
-			target := cfg.DefaultTarget()
-			if target != nil {
+
+			if bundleID == "" {
 				bundleID = target.BundleID
 			}
+		} else if bundleID == "" {
+			out.Error("cannot load config for bundle id", "error", err.Error(),
+				"hint", "use --bundle-id to specify the bundle identifier directly")
+			return
 		}
 
 		if bundleID == "" {
@@ -55,7 +55,7 @@ var logsCmd = &cobra.Command{
 		}
 
 		// resolve simulator
-		dev, err := device.ResolveSimulator(cmd.Context(), flags.Device, "")
+		dev, err := device.ResolveSimulator(cmd.Context(), flags.Device, defaultSimulator)
 		if err != nil {
 			out.Error(err.Error())
 			return

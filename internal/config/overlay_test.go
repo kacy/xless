@@ -64,8 +64,8 @@ overrides:
 				Name:     "App",
 				BundleID: "com.test.app",
 				Signing: SigningConfig{
-					Identity: "old-identity",
-					TeamID:   "OLD_TEAM",
+					Identity:     "old-identity",
+					TeamID:       "OLD_TEAM",
 					Entitlements: "old.entitlements",
 				},
 			},

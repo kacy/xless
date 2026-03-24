@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,12 +54,10 @@ var initCmd = &cobra.Command{
 			return
 		}
 
-		var templateType project.TemplateType
-		switch tmpl {
-		case "spm":
-			templateType = project.TemplateSPM
-		default:
-			templateType = project.TemplateSimple
+		templateType, err := parseTemplateType(tmpl)
+		if err != nil {
+			out.Error(err.Error(), "hint", "use --template simple or --template spm")
+			return
 		}
 
 		cfg := project.ScaffoldConfig{
@@ -104,4 +103,15 @@ var initCmd = &cobra.Command{
 			})
 		}
 	},
+}
+
+func parseTemplateType(name string) (project.TemplateType, error) {
+	switch name {
+	case "", string(project.TemplateSimple):
+		return project.TemplateSimple, nil
+	case string(project.TemplateSPM):
+		return project.TemplateSPM, nil
+	default:
+		return "", fmt.Errorf("unknown template %q", name)
+	}
 }

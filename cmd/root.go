@@ -73,9 +73,10 @@ func init() {
 // cliFlags builds a CLIFlags from the current viper values.
 func cliFlags() config.CLIFlags {
 	return config.CLIFlags{
-		Platform: viper.GetString("platform"),
-		Target:   viper.GetString("target"),
-		Config:   viper.GetString("build-config"),
-		Device:   viper.GetString("device"),
+		Platform:    viper.GetString("platform"),
+		Target:      viper.GetString("target"),
+		BuildConfig: viper.GetString("build-config"),
+		Device:      viper.GetString("device"),
+		ConfigPath:  viper.GetString("config"),
 	}
 }

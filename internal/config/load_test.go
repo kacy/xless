@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kacy/xless/internal/project"
 )
 
 func TestLoadNative(t *testing.T) {
@@ -134,9 +136,9 @@ defaults:
 	os.WriteFile(filepath.Join(dir, "xless.yml"), []byte(yml), 0o644)
 
 	flags := CLIFlags{
-		Target: "FlagApp",
-		Config: "release",
-		Device: "my-iphone",
+		Target:      "FlagApp",
+		BuildConfig: "release",
+		Device:      "my-iphone",
 	}
 	cfg, _, err := Load(dir, flags)
 	if err != nil {
@@ -155,6 +157,33 @@ defaults:
 	// simulator should not be overridden since flag was empty
 	if cfg.Defaults.Simulator != "iPhone 15" {
 		t.Errorf("defaults.simulator = %q, want %q", cfg.Defaults.Simulator, "iPhone 15")
+	}
+}
+
+func TestLoadExplicitConfigPath(t *testing.T) {
+	dir := t.TempDir()
+
+	configPath := filepath.Join(dir, "custom.yml")
+	yml := `
+project:
+  name: "CustomApp"
+  bundle_id: "com.test.CustomApp"
+`
+	os.WriteFile(configPath, []byte(yml), 0o644)
+
+	cfg, det, err := Load(dir, CLIFlags{ConfigPath: "custom.yml"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if det.Mode != project.ModeNative {
+		t.Fatalf("mode = %v, want %v", det.Mode, project.ModeNative)
+	}
+	if det.ConfigFile != configPath {
+		t.Fatalf("config file = %q, want %q", det.ConfigFile, configPath)
+	}
+	if cfg.Project.Name != "CustomApp" {
+		t.Fatalf("project name = %q, want %q", cfg.Project.Name, "CustomApp")
 	}
 }
 

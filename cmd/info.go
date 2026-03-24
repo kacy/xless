@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/kacy/xless/internal/config"
 	"github.com/kacy/xless/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -19,14 +17,8 @@ var infoCmd = &cobra.Command{
 	Short: "display resolved project configuration",
 	Long:  "reads the project configuration (from .xcodeproj and/or xless.yml) and displays the resolved result. useful for debugging and verifying settings.",
 	Run: func(cmd *cobra.Command, args []string) {
-		dir, err := os.Getwd()
-		if err != nil {
-			out.Error("cannot determine working directory", "error", err.Error())
-			return
-		}
-
 		flags := cliFlags()
-		cfg, det, err := config.Load(dir, flags)
+		_, cfg, det, err := loadProject(flags)
 		if err != nil {
 			out.Error(err.Error())
 			return
@@ -48,8 +40,13 @@ var infoCmd = &cobra.Command{
 			{Key: "targets", Value: fmt.Sprintf("%d", len(cfg.Targets))},
 		})
 
-		// show each target
-		for _, t := range cfg.Targets {
+		targets, err := selectedTargets(cfg, flags)
+		if err != nil {
+			printTargetSelectionError(err)
+			return
+		}
+
+		for _, t := range targets {
 			targetMap := output.OrderedMap{
 				{Key: "name", Value: t.Name},
 				{Key: "bundle_id", Value: t.BundleID},

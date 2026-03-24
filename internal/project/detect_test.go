@@ -8,12 +8,12 @@ import (
 
 func TestDetect(t *testing.T) {
 	tests := []struct {
-		name         string
-		setup        func(dir string)
-		wantMode     Mode
+		name          string
+		setup         func(dir string)
+		wantMode      Mode
 		wantXcodeproj bool
-		wantConfig   bool
-		wantErr      bool
+		wantConfig    bool
+		wantErr       bool
 	}{
 		{
 			name: "xcodeproj and xless.yml",
@@ -71,7 +71,7 @@ func TestDetect(t *testing.T) {
 			dir := t.TempDir()
 			tt.setup(dir)
 
-			result, err := Detect(dir)
+			result, err := Detect(dir, "")
 
 			if tt.wantErr {
 				if err == nil {
@@ -96,6 +96,35 @@ func TestDetect(t *testing.T) {
 				t.Errorf("config file present = %v, want %v", result.ConfigFile != "", tt.wantConfig)
 			}
 		})
+	}
+}
+
+func TestDetectExplicitConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "custom.yml")
+	if err := os.WriteFile(configPath, []byte("project:\n  name: MyApp\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	result, err := Detect(dir, "custom.yml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Mode != ModeNative {
+		t.Fatalf("mode = %v, want %v", result.Mode, ModeNative)
+	}
+	if result.ConfigFile != configPath {
+		t.Fatalf("config file = %q, want %q", result.ConfigFile, configPath)
+	}
+}
+
+func TestDetectMissingExplicitConfigPath(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := Detect(dir, "missing.yml")
+	if err == nil {
+		t.Fatal("expected error for missing explicit config path")
 	}
 }
 

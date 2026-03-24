@@ -43,9 +43,12 @@ type DetectResult struct {
 //	.xcodeproj found + no xless.yml     → ModeXcodeproj (zero config needed)
 //	no .xcodeproj    + xless.yml found  → ModeNative
 //	no .xcodeproj    + no xless.yml     → error with hint
-func Detect(dir string) (*DetectResult, error) {
+func Detect(dir, configPath string) (*DetectResult, error) {
 	xcodeprojDir := findXcodeproj(dir)
-	configFile := findConfigFile(dir)
+	configFile, err := resolveConfigFile(dir, configPath)
+	if err != nil {
+		return nil, err
+	}
 
 	if xcodeprojDir == "" && configFile == "" {
 		return nil, fmt.Errorf(
@@ -66,6 +69,30 @@ func Detect(dir string) (*DetectResult, error) {
 	}
 
 	return result, nil
+}
+
+func resolveConfigFile(dir, explicitPath string) (string, error) {
+	if explicitPath == "" {
+		return findConfigFile(dir), nil
+	}
+
+	path := explicitPath
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("config file %q not found", explicitPath)
+		}
+		return "", fmt.Errorf("checking config file %q: %w", explicitPath, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("config path %q is a directory", explicitPath)
+	}
+
+	return path, nil
 }
 
 // findXcodeproj returns the first .xcodeproj directory found in dir, or empty string.

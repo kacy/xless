@@ -12,7 +12,7 @@ import (
 // Load detects the project mode and loads the unified config.
 // Resolution order: CLI flags > xless.yml > xcodeproj (live-read) > defaults.
 func Load(dir string, flags CLIFlags) (*ProjectConfig, *project.DetectResult, error) {
-	det, err := project.Detect(dir)
+	det, err := project.Detect(dir, flags.ConfigPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -71,21 +71,21 @@ type nativeYAML struct {
 		MinIOS     string   `yaml:"min_ios"`
 		SwiftFlags []string `yaml:"swift_flags"`
 	} `yaml:"build"`
-	Signing SigningConfig `yaml:"signing"`
+	Signing  SigningConfig  `yaml:"signing"`
 	Defaults DefaultsConfig `yaml:"defaults"`
 }
 
 func (n *nativeYAML) toProjectConfig() *ProjectConfig {
 	target := TargetConfig{
-		Name:       n.Project.Name,
-		BundleID:   n.Project.BundleID,
+		Name:        n.Project.Name,
+		BundleID:    n.Project.BundleID,
 		ProductType: ProductApp,
-		Sources:    n.Build.Sources,
-		MinIOS:     n.Build.MinIOS,
-		SwiftFlags: n.Build.SwiftFlags,
-		Signing:    n.Signing,
-		Version:    n.Project.Version,
-		BuildNum:   n.Project.BuildNumber,
+		Sources:     n.Build.Sources,
+		MinIOS:      n.Build.MinIOS,
+		SwiftFlags:  n.Build.SwiftFlags,
+		Signing:     n.Signing,
+		Version:     n.Project.Version,
+		BuildNum:    n.Project.BuildNumber,
 	}
 
 	return &ProjectConfig{
@@ -107,7 +107,7 @@ func loadXcodeproj(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 		return nil, err
 	}
 
-	configName := flags.Config
+	configName := flags.BuildConfig
 	if configName == "" {
 		configName = DefaultConfig
 	}
@@ -131,8 +131,8 @@ func applyFlags(cfg *ProjectConfig, flags CLIFlags) {
 	if flags.Target != "" {
 		cfg.Defaults.Target = flags.Target
 	}
-	if flags.Config != "" {
-		cfg.Defaults.Config = flags.Config
+	if flags.BuildConfig != "" {
+		cfg.Defaults.Config = flags.BuildConfig
 	}
 	if flags.Device != "" {
 		cfg.Defaults.Device = flags.Device
