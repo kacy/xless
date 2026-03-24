@@ -322,6 +322,52 @@ overrides:
 	}
 }
 
+func TestLoadWorkspace(t *testing.T) {
+	dir := t.TempDir()
+
+	workspaceDir := filepath.Join(dir, "App.xcworkspace")
+	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	workspaceData := `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+  <FileRef location="group:SimpleApp.xcodeproj"></FileRef>
+</Workspace>`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "contents.xcworkspacedata"), []byte(workspaceData), 0o644); err != nil {
+		t.Fatalf("write workspace: %v", err)
+	}
+
+	xcodeprojDir := filepath.Join(dir, "SimpleApp.xcodeproj")
+	if err := os.MkdirAll(xcodeprojDir, 0o755); err != nil {
+		t.Fatalf("mkdir xcodeproj: %v", err)
+	}
+	data, err := os.ReadFile("../xcodeproj/testdata/simple.pbxproj")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(xcodeprojDir, "project.pbxproj"), data, 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	cfg, det, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if det.Mode != project.ModeWorkspace {
+		t.Fatalf("mode = %v, want %v", det.Mode, project.ModeWorkspace)
+	}
+	if det.WorkspaceDir != workspaceDir {
+		t.Fatalf("workspace dir = %q, want %q", det.WorkspaceDir, workspaceDir)
+	}
+	if len(cfg.Targets) != 1 {
+		t.Fatalf("targets = %d, want 1", len(cfg.Targets))
+	}
+	if cfg.Targets[0].SourceRoot != dir {
+		t.Fatalf("source root = %q, want %q", cfg.Targets[0].SourceRoot, dir)
+	}
+}
+
 func TestLoadXcodeprojOverlayDefaultConfigSelectsReleaseSettings(t *testing.T) {
 	dir := t.TempDir()
 

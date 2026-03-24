@@ -3,8 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/kacy/xless/internal/project"
+	"github.com/kacy/xless/internal/workspace"
 	"github.com/kacy/xless/internal/xcodeproj"
 	"gopkg.in/yaml.v3"
 )
@@ -22,6 +25,8 @@ func Load(dir string, flags CLIFlags) (*ProjectConfig, *project.DetectResult, er
 	switch det.Mode {
 	case project.ModeNative:
 		cfg, err = loadNative(det.ConfigFile)
+	case project.ModeWorkspace:
+		cfg, err = loadWorkspace(det, flags)
 	case project.ModeXcodeproj:
 		cfg, err = loadXcodeproj(det, flags)
 	default:
@@ -87,6 +92,9 @@ func (n *nativeYAML) toProjectConfig() *ProjectConfig {
 		Version:     n.Project.Version,
 		BuildNum:    n.Project.BuildNumber,
 	}
+	if n.Build.Type != "" && n.Build.Type != "simple" {
+		target.Unsupported = append(target.Unsupported, "native build type "+n.Build.Type)
+	}
 
 	return &ProjectConfig{
 		Project:  ProjectInfo{Name: n.Project.Name},
@@ -124,8 +132,64 @@ func loadXcodeproj(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 	}
 
 	cfg := ConvertXcodeProject(xp, configName)
+	for i := range cfg.Targets {
+		cfg.Targets[i].SourceRoot = filepath.Dir(det.XcodeprojDir)
+	}
 
 	// apply xless.yml overlay if present
+	if ov != nil {
+		det.Warnings = append(det.Warnings, applyOverlay(cfg, ov)...)
+	}
+
+	return cfg, nil
+}
+
+func loadWorkspace(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, error) {
+	ws, err := workspace.Parse(det.WorkspaceDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(ws.Projects) == 0 {
+		return nil, fmt.Errorf("workspace %s contains no .xcodeproj references", det.WorkspaceDir)
+	}
+
+	var ov *overlayYAML
+	if det.ConfigFile != "" {
+		ov, err = loadOverlay(det.ConfigFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	configName := flags.BuildConfig
+	if configName == "" && ov != nil && ov.Defaults.Config != "" {
+		configName = ov.Defaults.Config
+	}
+	if configName == "" {
+		configName = DefaultConfig
+	}
+
+	projectName := strings.TrimSuffix(filepath.Base(det.WorkspaceDir), ".xcworkspace")
+	cfg := &ProjectConfig{
+		Project: ProjectInfo{Name: projectName},
+	}
+
+	for _, projDir := range ws.Projects {
+		raw, err := xcodeproj.Parse(projDir)
+		if err != nil {
+			return nil, err
+		}
+		xp, err := xcodeproj.Resolve(raw)
+		if err != nil {
+			return nil, err
+		}
+		memberCfg := ConvertXcodeProject(xp, configName)
+		for _, target := range memberCfg.Targets {
+			target.SourceRoot = filepath.Dir(projDir)
+			cfg.Targets = append(cfg.Targets, target)
+		}
+	}
+
 	if ov != nil {
 		det.Warnings = append(det.Warnings, applyOverlay(cfg, ov)...)
 	}

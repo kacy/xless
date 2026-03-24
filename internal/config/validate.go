@@ -48,6 +48,19 @@ func Validate(cfg *ProjectConfig) error {
 	return nil
 }
 
+// ValidateTargetSupport reports unsupported target capabilities for build/run flows.
+func ValidateTargetSupport(target *TargetConfig) error {
+	if len(target.Unsupported) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"target %q uses unsupported capabilities:\n  - %s",
+		target.Name,
+		strings.Join(target.Unsupported, "\n  - "),
+	)
+}
+
 func targetNames(cfg *ProjectConfig) string {
 	names := make([]string, len(cfg.Targets))
 	for i, t := range cfg.Targets {

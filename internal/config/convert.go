@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/kacy/xless/internal/xcodeproj"
@@ -48,6 +49,7 @@ func convertTarget(xt xcodeproj.XcodeTarget, configName string) TargetConfig {
 		Sources:      xt.SourceFiles,
 		Resources:    xt.ResourceFiles,
 		Dependencies: xt.Dependencies,
+		Packages:     xt.PackageProducts,
 	}
 
 	// extract build settings from the selected configuration
@@ -66,6 +68,18 @@ func convertTarget(xt xcodeproj.XcodeTarget, configName string) TargetConfig {
 	// extract swift flags from OTHER_SWIFT_FLAGS
 	if flags := xt.Setting(configName, "OTHER_SWIFT_FLAGS"); flags != "" {
 		tc.SwiftFlags = splitFlags(flags)
+	}
+
+	for _, src := range tc.Sources {
+		if ext := strings.ToLower(filepath.Ext(src)); ext != ".swift" {
+			tc.Unsupported = append(tc.Unsupported, "non-swift source file "+src)
+		}
+	}
+	if header := xt.Setting(configName, "SWIFT_OBJC_BRIDGING_HEADER"); header != "" {
+		tc.Unsupported = append(tc.Unsupported, "Objective-C bridging header "+header)
+	}
+	if len(tc.Packages) > 0 {
+		tc.Unsupported = append(tc.Unsupported, "Swift package dependencies: "+strings.Join(tc.Packages, ", "))
 	}
 
 	return tc

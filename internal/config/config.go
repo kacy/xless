@@ -29,6 +29,9 @@ type TargetConfig struct {
 	Version      string        `yaml:"version"`
 	BuildNum     string        `yaml:"build_number"`
 	Dependencies []string      `yaml:"dependencies"`
+	SourceRoot   string        `yaml:"-"`
+	Packages     []string      `yaml:"-"`
+	Unsupported  []string      `yaml:"-"`
 }
 
 // SigningConfig holds code signing settings.

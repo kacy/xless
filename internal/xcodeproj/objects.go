@@ -21,12 +21,13 @@ type XcodeProject struct {
 
 // XcodeTarget is a resolved native target.
 type XcodeTarget struct {
-	Name           string
-	ProductType    string // e.g. "com.apple.product-type.application"
-	Configurations []BuildConfig
-	SourceFiles    []string // relative paths
-	ResourceFiles  []string // relative paths
-	Dependencies   []string // target names this target depends on
+	Name            string
+	ProductType     string // e.g. "com.apple.product-type.application"
+	Configurations  []BuildConfig
+	SourceFiles     []string // relative paths
+	ResourceFiles   []string // relative paths
+	Dependencies    []string // target names this target depends on
+	PackageProducts []string
 }
 
 // BuildConfig holds resolved build settings for a named configuration.
@@ -37,16 +38,17 @@ type BuildConfig struct {
 
 // known pbxproj isa values we care about
 const (
-	isaPBXProject             = "PBXProject"
-	isaPBXNativeTarget        = "PBXNativeTarget"
-	isaXCConfigurationList    = "XCConfigurationList"
-	isaXCBuildConfiguration   = "XCBuildConfiguration"
-	isaPBXSourcesBuildPhase   = "PBXSourcesBuildPhase"
-	isaPBXResourcesBuildPhase = "PBXResourcesBuildPhase"
-	isaPBXBuildFile           = "PBXBuildFile"
-	isaPBXFileReference       = "PBXFileReference"
-	isaPBXGroup               = "PBXGroup"
-	isaPBXTargetDependency    = "PBXTargetDependency"
+	isaPBXProject                      = "PBXProject"
+	isaPBXNativeTarget                 = "PBXNativeTarget"
+	isaXCConfigurationList             = "XCConfigurationList"
+	isaXCBuildConfiguration            = "XCBuildConfiguration"
+	isaPBXSourcesBuildPhase            = "PBXSourcesBuildPhase"
+	isaPBXResourcesBuildPhase          = "PBXResourcesBuildPhase"
+	isaPBXBuildFile                    = "PBXBuildFile"
+	isaPBXFileReference                = "PBXFileReference"
+	isaPBXGroup                        = "PBXGroup"
+	isaPBXTargetDependency             = "PBXTargetDependency"
+	isaXCSwiftPackageProductDependency = "XCSwiftPackageProductDependency"
 )
 
 // common Xcode product types

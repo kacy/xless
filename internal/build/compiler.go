@@ -136,6 +136,7 @@ func buildTriple(arch string, minIOS string, platform toolchain.Platform) string
 // buildSwiftcArgs constructs the full argument list for swiftc.
 func buildSwiftcArgs(bc *BuildContext, sources []string) []string {
 	args := []string{
+		"-parse-as-library",
 		"-sdk", bc.Toolchain.SDKPath(bc.Platform),
 		"-target", buildTriple(bc.Toolchain.Arch(), bc.Target.MinIOS, bc.Platform),
 	}

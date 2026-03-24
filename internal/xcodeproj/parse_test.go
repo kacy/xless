@@ -217,3 +217,46 @@ func TestSettingFallback(t *testing.T) {
 		t.Errorf("Setting(debug, Z) = %q, want empty", v)
 	}
 }
+
+func TestResolvePackageProducts(t *testing.T) {
+	raw := &RawProject{
+		RootObject: "project",
+		Objects: map[string]map[string]any{
+			"project": {
+				"isa":     isaPBXProject,
+				"targets": []any{"target"},
+			},
+			"target": {
+				"isa":                        isaPBXNativeTarget,
+				"name":                       "App",
+				"productType":                productTypeApplication,
+				"buildConfigurationList":     "configs",
+				"packageProductDependencies": []any{"pkg"},
+			},
+			"configs": {
+				"isa":                 isaXCConfigurationList,
+				"buildConfigurations": []any{"debug"},
+			},
+			"debug": {
+				"isa":           isaXCBuildConfiguration,
+				"name":          "Debug",
+				"buildSettings": map[string]any{},
+			},
+			"pkg": {
+				"isa":         isaXCSwiftPackageProductDependency,
+				"productName": "WeatherKit",
+			},
+		},
+	}
+
+	xp, err := Resolve(raw)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(xp.Targets) != 1 {
+		t.Fatalf("targets = %d, want 1", len(xp.Targets))
+	}
+	if len(xp.Targets[0].PackageProducts) != 1 || xp.Targets[0].PackageProducts[0] != "WeatherKit" {
+		t.Fatalf("package products = %v", xp.Targets[0].PackageProducts)
+	}
+}

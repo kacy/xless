@@ -11,14 +11,18 @@ import (
 type Mode int
 
 const (
+	// ModeWorkspace uses .xcworkspace as source of truth, loading member xcodeproj files.
+	ModeWorkspace Mode = iota
 	// ModeXcodeproj uses .xcodeproj as source of truth, with optional xless.yml overlay.
-	ModeXcodeproj Mode = iota
+	ModeXcodeproj
 	// ModeNative uses xless.yml as the full configuration source.
 	ModeNative
 )
 
 func (m Mode) String() string {
 	switch m {
+	case ModeWorkspace:
+		return "xcworkspace"
 	case ModeXcodeproj:
 		return "xcodeproj"
 	case ModeNative:
@@ -31,6 +35,7 @@ func (m Mode) String() string {
 // DetectResult holds the outcome of project detection.
 type DetectResult struct {
 	Mode         Mode
+	WorkspaceDir string // path to .xcworkspace directory, empty if not found
 	XcodeprojDir string // path to .xcodeproj directory, empty if not found
 	ConfigFile   string // path to xless.yml, empty if not found
 	Warnings     []string
@@ -45,6 +50,10 @@ type DetectResult struct {
 //	no .xcodeproj    + xless.yml found  → ModeNative
 //	no .xcodeproj    + no xless.yml     → error with hint
 func Detect(dir, configPath string) (*DetectResult, error) {
+	workspaceDir, err := findWorkspace(dir)
+	if err != nil {
+		return nil, err
+	}
 	xcodeprojDir, err := findXcodeproj(dir)
 	if err != nil {
 		return nil, err
@@ -54,25 +63,52 @@ func Detect(dir, configPath string) (*DetectResult, error) {
 		return nil, err
 	}
 
-	if xcodeprojDir == "" && configFile == "" {
+	if workspaceDir == "" && xcodeprojDir == "" && configFile == "" {
 		return nil, fmt.Errorf(
-			"no .xcodeproj or xless.yml found in %s (run `xless init` to create a project, or open an existing xcode project directory)",
+			"no .xcworkspace, .xcodeproj, or xless.yml found in %s (run `xless init` to create a project, or open an existing xcode project directory)",
 			dir,
 		)
 	}
 
 	result := &DetectResult{
+		WorkspaceDir: workspaceDir,
 		XcodeprojDir: xcodeprojDir,
 		ConfigFile:   configFile,
 	}
 
-	if xcodeprojDir != "" {
+	if workspaceDir != "" {
+		result.Mode = ModeWorkspace
+	} else if xcodeprojDir != "" {
 		result.Mode = ModeXcodeproj
 	} else {
 		result.Mode = ModeNative
 	}
 
 	return result, nil
+}
+
+// findWorkspace returns the .xcworkspace directory found in dir, or empty string.
+func findWorkspace(dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", nil
+	}
+
+	var matches []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasSuffix(entry.Name(), ".xcworkspace") {
+			matches = append(matches, filepath.Join(dir, entry.Name()))
+		}
+	}
+
+	if len(matches) > 1 {
+		return "", fmt.Errorf("multiple .xcworkspace directories found in %s (use a more specific project directory or --config)", dir)
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+
+	return "", nil
 }
 
 func resolveConfigFile(dir, explicitPath string) (string, error) {

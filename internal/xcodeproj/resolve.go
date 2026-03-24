@@ -121,13 +121,26 @@ func resolveTarget(raw *RawProject, tObj map[string]any) (*XcodeTarget, error) {
 		}
 	}
 
+	packageDepIDs := getStringSlice(tObj, "packageProductDependencies")
+	var packageProducts []string
+	for _, pkgID := range packageDepIDs {
+		pkgObj := raw.Objects[pkgID]
+		if pkgObj == nil || getString(pkgObj, "isa") != isaXCSwiftPackageProductDependency {
+			continue
+		}
+		if productName := getString(pkgObj, "productName"); productName != "" {
+			packageProducts = append(packageProducts, productName)
+		}
+	}
+
 	return &XcodeTarget{
-		Name:           name,
-		ProductType:    productType,
-		Configurations: configs,
-		SourceFiles:    sourceFiles,
-		ResourceFiles:  resourceFiles,
-		Dependencies:   deps,
+		Name:            name,
+		ProductType:     productType,
+		Configurations:  configs,
+		SourceFiles:     sourceFiles,
+		ResourceFiles:   resourceFiles,
+		Dependencies:    deps,
+		PackageProducts: packageProducts,
 	}, nil
 }
 

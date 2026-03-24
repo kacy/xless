@@ -2,7 +2,7 @@
 
 build and run ios apps from the terminal. no xcode ide required.
 
-xless drives the apple toolchain directly — `swiftc`, `simctl`, `devicectl`, `codesign` — so you never need to open xcode. it can read your existing `.xcodeproj` or work with its own simple config file.
+xless drives the apple toolchain directly — `swiftc`, `simctl`, `devicectl`, `codesign` — so you never need to open xcode. it can read your existing `.xcworkspace`, `.xcodeproj`, or work with its own simple config file.
 
 > xcode must be *installed* (for sdks and simulator runtimes), but you never open it.
 
@@ -53,6 +53,8 @@ xless auto-detects your project type:
 
 | what's in the directory | what xless does |
 |---|---|
+| `.xcworkspace` + `xless.yml` | reads the workspace's member xcodeproj files as source of truth, applies xless.yml as overlay |
+| `.xcworkspace` only | reads workspace member xcodeproj files directly |
 | `.xcodeproj` + `xless.yml` | reads xcodeproj as source of truth, applies xless.yml as overlay |
 | `.xcodeproj` only | reads xcodeproj directly — zero config |
 | `xless.yml` only | uses xless.yml as the full config (native mode) |
@@ -70,21 +72,21 @@ xless init myapp --template spm
 xless init myapp --bundle-id com.mycompany.myapp --min-ios 17.0
 ```
 
-the simple template creates a minimal SwiftUI app with `xless.yml`. the spm template adds a `Package.swift` manifest.
+the simple template creates a minimal SwiftUI app with `xless.yml`. the spm template adds a `Package.swift` manifest for future use.
 
-> note: the build pipeline currently supports `type: "simple"` only. spm support is planned.
+> note: the build pipeline currently supports `type: "simple"` only. native `type: "spm"` projects fail explicitly as unsupported.
 
-### xcodeproj support
+### xcodeproj and workspace support
 
-xless reads your `.xcodeproj/project.pbxproj` live at build time. it extracts targets, build configurations, source files, signing settings, and deployment targets. no import step, no config drift.
+xless reads your `.xcodeproj/project.pbxproj` live at build time. when a workspace is present, it reads the member xcodeproj files referenced by `contents.xcworkspacedata`. it extracts targets, build configurations, source files, signing settings, and deployment targets. no import step, no config drift.
 
 ```sh
 $ xless info
-  info  project detected mode=xcodeproj
-  info  xcodeproj path=./MyApp.xcodeproj
+  info  project detected mode=xcworkspace
+  info  xcworkspace path=./MyApp.xcworkspace
   project:
     name     MyApp
-    mode     xcodeproj
+    mode     xcworkspace
     targets  3
   target:MyApp:
     name          MyApp
@@ -183,6 +185,19 @@ signing:
 ```
 
 the device build pipeline produces an IPA (`.ipa`) file that gets installed via `devicectl`.
+
+## support limits
+
+xless is currently focused on `swift-only` apps.
+
+- supported:
+  - native `xless.yml` projects with `build.type: "simple"`
+  - swift-only `.xcodeproj` apps
+  - swift-only `.xcworkspace` apps whose member projects are xcodeproj-based
+- not supported yet:
+  - objective-c or mixed swift/objective-c targets
+  - swift package dependencies referenced from xcodeproj/workspace targets
+  - native `build.type: "spm"`
 
 ### xless.yml overlay
 

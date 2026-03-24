@@ -67,6 +67,10 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 		printTargetSelectionError(err)
 		return nil, nil, false
 	}
+	if err := config.ValidateTargetSupport(target); err != nil {
+		out.Error(err.Error())
+		return nil, nil, false
+	}
 
 	platform := resolvePlatform(flags)
 	buildConfig := resolveBuildConfig(flags, cfg)
@@ -74,6 +78,11 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 	tc, err := discoverToolchain(cmd)
 	if err != nil {
 		return nil, nil, false
+	}
+
+	projectDir := dir
+	if target.SourceRoot != "" {
+		projectDir = target.SourceRoot
 	}
 
 	buildDir := filepath.Join(dir, ".build", target.Name)
@@ -84,7 +93,7 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 		Toolchain:   tc,
 		Platform:    platform,
 		BuildConfig: buildConfig,
-		ProjectDir:  dir,
+		ProjectDir:  projectDir,
 		BuildDir:    buildDir,
 		Out:         out,
 	}

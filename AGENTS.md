@@ -21,6 +21,17 @@ xless clean
 
 all commands accept `--json` for structured ndjson output.
 
+## current support boundary
+
+- supported:
+  - native `xless.yml` projects with `build.type: "simple"`
+  - swift-only `.xcodeproj` apps
+  - swift-only `.xcworkspace` apps that reference xcodeproj members
+- unsupported:
+  - objective-c or mixed swift/objective-c targets
+  - swift package dependencies referenced from xcodeproj/workspace builds
+  - native `build.type: "spm"` beyond scaffolding
+
 ## project structure
 
 ```
@@ -44,7 +55,7 @@ project:
   build_number: "1"
 
 build:
-  type: "simple"           # simple (swiftc) or spm (planned)
+  type: "simple"           # simple (swiftc). "spm" scaffolds only and is not buildable yet.
   sources: ["Sources/MyApp/"]
   min_ios: "16.0"
 
@@ -61,9 +72,9 @@ defaults:
   device: ""
 ```
 
-## xless.yml (xcodeproj overlay mode)
+## xless.yml (xcodeproj / workspace overlay mode)
 
-when a `.xcodeproj` exists, xless reads it as source of truth. `xless.yml` is optional and only overrides specific settings:
+when a `.xcodeproj` or `.xcworkspace` exists, xless reads the project graph as source of truth. `xless.yml` is optional and only overrides specific settings:
 
 ```yaml
 defaults:
@@ -82,7 +93,7 @@ overrides:
 
 ## config resolution order
 
-cli flags > xless.yml > xcodeproj > defaults
+cli flags > xless.yml > xcworkspace/xcodeproj > defaults
 
 environment variables: `XLESS_PLATFORM`, `XLESS_TARGET`, `XLESS_JSON`, etc.
 

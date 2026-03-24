@@ -140,3 +140,21 @@ func TestDefaultTarget(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateTargetSupport(t *testing.T) {
+	target := &TargetConfig{
+		Name:        "App",
+		Unsupported: []string{"Swift package dependencies: WeatherKit", "non-swift source file AppDelegate.m"},
+	}
+
+	err := ValidateTargetSupport(target)
+	if err == nil {
+		t.Fatal("expected unsupported target error")
+	}
+	if !strings.Contains(err.Error(), "unsupported capabilities") {
+		t.Fatalf("error = %q", err)
+	}
+	if !strings.Contains(err.Error(), "WeatherKit") {
+		t.Fatalf("error = %q", err)
+	}
+}

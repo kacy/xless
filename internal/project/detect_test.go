@@ -16,6 +16,25 @@ func TestDetect(t *testing.T) {
 		wantErr       bool
 	}{
 		{
+			name: "workspace only",
+			setup: func(dir string) {
+				os.Mkdir(filepath.Join(dir, "MyApp.xcworkspace"), 0o755)
+			},
+			wantMode:      ModeWorkspace,
+			wantXcodeproj: false,
+			wantConfig:    false,
+		},
+		{
+			name: "workspace takes precedence over xcodeproj",
+			setup: func(dir string) {
+				os.Mkdir(filepath.Join(dir, "MyApp.xcworkspace"), 0o755)
+				os.Mkdir(filepath.Join(dir, "MyApp.xcodeproj"), 0o755)
+			},
+			wantMode:      ModeWorkspace,
+			wantXcodeproj: true,
+			wantConfig:    false,
+		},
+		{
 			name: "xcodeproj and xless.yml",
 			setup: func(dir string) {
 				os.Mkdir(filepath.Join(dir, "MyApp.xcodeproj"), 0o755)
@@ -58,9 +77,9 @@ func TestDetect(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "non-xcodeproj directory ignored",
+			name: "non-project directory ignored",
 			setup: func(dir string) {
-				os.Mkdir(filepath.Join(dir, "MyApp.xcworkspace"), 0o755)
+				os.Mkdir(filepath.Join(dir, "whatever"), 0o755)
 			},
 			wantErr: true,
 		},
@@ -98,6 +117,9 @@ func TestDetect(t *testing.T) {
 
 			if (result.XcodeprojDir != "") != tt.wantXcodeproj {
 				t.Errorf("xcodeproj dir present = %v, want %v", result.XcodeprojDir != "", tt.wantXcodeproj)
+			}
+			if tt.wantMode == ModeWorkspace && result.WorkspaceDir == "" {
+				t.Errorf("workspace dir should be present")
 			}
 
 			if (result.ConfigFile != "") != tt.wantConfig {
@@ -141,6 +163,7 @@ func TestModeString(t *testing.T) {
 		mode Mode
 		want string
 	}{
+		{ModeWorkspace, "xcworkspace"},
 		{ModeXcodeproj, "xcodeproj"},
 		{ModeNative, "native"},
 		{Mode(99), "unknown"},

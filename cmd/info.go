@@ -29,6 +29,9 @@ var infoCmd = &cobra.Command{
 		if det.XcodeprojDir != "" {
 			out.Info("xcodeproj", "path", det.XcodeprojDir)
 		}
+		if det.WorkspaceDir != "" {
+			out.Info("xcworkspace", "path", det.WorkspaceDir)
+		}
 		if det.ConfigFile != "" {
 			out.Info("config file", "path", det.ConfigFile)
 		}
@@ -82,6 +85,15 @@ var infoCmd = &cobra.Command{
 			}
 			if len(t.Dependencies) > 0 {
 				targetMap = append(targetMap, output.KV{Key: "dependencies", Value: strings.Join(t.Dependencies, ", ")})
+			}
+			if len(t.Packages) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "packages", Value: strings.Join(t.Packages, ", ")})
+			}
+			if t.SourceRoot != "" {
+				targetMap = append(targetMap, output.KV{Key: "source_root", Value: t.SourceRoot})
+			}
+			if len(t.Unsupported) > 0 {
+				targetMap = append(targetMap, output.KV{Key: "unsupported", Value: strings.Join(t.Unsupported, "; ")})
 			}
 
 			out.Data(fmt.Sprintf("target:%s", t.Name), targetMap)

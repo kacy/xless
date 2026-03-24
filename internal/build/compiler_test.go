@@ -165,6 +165,7 @@ func TestBuildSwiftcArgsDebug(t *testing.T) {
 
 	assertContains(t, args, "-sdk", "/sdk")
 	assertContains(t, args, "-target", "arm64-apple-ios16.0-simulator")
+	assertContainsValue(t, args, "-parse-as-library")
 	assertContainsValue(t, args, "-Onone")
 	assertContainsValue(t, args, "-g")
 	assertContainsValue(t, args, "-DDEBUG")
