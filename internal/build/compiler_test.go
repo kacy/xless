@@ -14,11 +14,11 @@ type mockToolchain struct {
 	arch string
 }
 
-func (m *mockToolchain) SwiftcPath() string              { return "/usr/bin/swiftc" }
+func (m *mockToolchain) SwiftcPath() string                  { return "/usr/bin/swiftc" }
 func (m *mockToolchain) SDKPath(_ toolchain.Platform) string { return "/sdk" }
-func (m *mockToolchain) SwiftVersion() string            { return "5.10" }
-func (m *mockToolchain) XcodeVersion() string            { return "16.0" }
-func (m *mockToolchain) Arch() string                    { return m.arch }
+func (m *mockToolchain) SwiftVersion() string                { return "5.10" }
+func (m *mockToolchain) XcodeVersion() string                { return "16.0" }
+func (m *mockToolchain) Arch() string                        { return m.arch }
 
 func TestResolveSwiftFilesDirectory(t *testing.T) {
 	dir := t.TempDir()
@@ -46,6 +46,16 @@ func TestResolveSwiftFilesIndividual(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+}
+
+func TestResolveSwiftFilesRejectsNonSwiftIndividualFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "README.md"), "# docs")
+
+	_, err := resolveSwiftFiles(dir, []string{"README.md"})
+	if err == nil {
+		t.Fatal("expected error for non-swift source file")
 	}
 }
 
@@ -153,7 +163,7 @@ func TestBuildSwiftcArgsDebug(t *testing.T) {
 
 	args := buildSwiftcArgs(bc, []string{"main.swift"})
 
-	assertContains(t, args, "-sdk", "iphonesimulator")
+	assertContains(t, args, "-sdk", "/sdk")
 	assertContains(t, args, "-target", "arm64-apple-ios16.0-simulator")
 	assertContainsValue(t, args, "-Onone")
 	assertContainsValue(t, args, "-g")
@@ -198,7 +208,7 @@ func TestBuildSwiftcArgsDeviceTriple(t *testing.T) {
 
 	args := buildSwiftcArgs(bc, []string{"main.swift"})
 
-	assertContains(t, args, "-sdk", "iphoneos")
+	assertContains(t, args, "-sdk", "/sdk")
 	assertContains(t, args, "-target", "arm64-apple-ios16.0")
 }
 

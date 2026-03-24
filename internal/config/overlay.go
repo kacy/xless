@@ -23,10 +23,7 @@ type targetOverride struct {
 	MinIOS     string         `yaml:"min_ios"`
 }
 
-// ApplyOverlay reads an xless.yml overlay file and merges it into cfg.
-// Returns warnings for unknown target names (not errors — overlay may be ahead
-// of the xcodeproj state). Returns error only for parse/read failures.
-func ApplyOverlay(cfg *ProjectConfig, overlayPath string) ([]string, error) {
+func loadOverlay(overlayPath string) (*overlayYAML, error) {
 	data, err := os.ReadFile(overlayPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading overlay: %w", err)
@@ -35,6 +32,26 @@ func ApplyOverlay(cfg *ProjectConfig, overlayPath string) ([]string, error) {
 	var ov overlayYAML
 	if err := yaml.Unmarshal(data, &ov); err != nil {
 		return nil, fmt.Errorf("parsing overlay %s: %w", overlayPath, err)
+	}
+
+	return &ov, nil
+}
+
+// ApplyOverlay reads an xless.yml overlay file and merges it into cfg.
+// Returns warnings for unknown target names (not errors — overlay may be ahead
+// of the xcodeproj state). Returns error only for parse/read failures.
+func ApplyOverlay(cfg *ProjectConfig, overlayPath string) ([]string, error) {
+	ov, err := loadOverlay(overlayPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return applyOverlay(cfg, ov), nil
+}
+
+func applyOverlay(cfg *ProjectConfig, ov *overlayYAML) []string {
+	if ov == nil {
+		return nil
 	}
 
 	// merge defaults
@@ -78,5 +95,5 @@ func ApplyOverlay(cfg *ProjectConfig, overlayPath string) ([]string, error) {
 		}
 	}
 
-	return warnings, nil
+	return warnings
 }

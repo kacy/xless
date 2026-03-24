@@ -84,16 +84,16 @@ func writeInfoPlist(bc *BuildContext, appDir string) error {
 	}
 
 	info := map[string]any{
-		"CFBundleName":                bc.Target.Name,
-		"CFBundleIdentifier":          bc.Target.BundleID,
-		"CFBundleVersion":             bc.Target.BuildNum,
-		"CFBundleShortVersionString":  bc.Target.Version,
-		"CFBundleExecutable":          bc.Target.Name,
-		"CFBundlePackageType":         "APPL",
-		"MinimumOSVersion":            bc.Target.MinIOS,
-		"UILaunchScreen":              map[string]any{},
-		"UIDeviceFamily":              []int{1, 2},
-		"CFBundleSupportedPlatforms":  supportedPlatforms,
+		"CFBundleName":               bc.Target.Name,
+		"CFBundleIdentifier":         bc.Target.BundleID,
+		"CFBundleVersion":            bc.Target.BuildNum,
+		"CFBundleShortVersionString": bc.Target.Version,
+		"CFBundleExecutable":         bc.Target.Name,
+		"CFBundlePackageType":        "APPL",
+		"MinimumOSVersion":           bc.Target.MinIOS,
+		"UILaunchScreen":             map[string]any{},
+		"UIDeviceFamily":             []int{1, 2},
+		"CFBundleSupportedPlatforms": supportedPlatforms,
 	}
 
 	f, err := os.Create(plistPath)

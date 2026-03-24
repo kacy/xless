@@ -64,6 +64,14 @@ func TestDetect(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "multiple xcodeproj directories error",
+			setup: func(dir string) {
+				os.Mkdir(filepath.Join(dir, "AppOne.xcodeproj"), 0o755)
+				os.Mkdir(filepath.Join(dir, "AppTwo.xcodeproj"), 0o755)
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

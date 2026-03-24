@@ -101,6 +101,9 @@ func TestParseDevicectlOutput(t *testing.T) {
 	if ipad.DeviceType != "iPad" {
 		t.Errorf("expected deviceType 'iPad', got %q", ipad.DeviceType)
 	}
+	if ipad.Connected {
+		t.Error("iPad should be disconnected when tunnelState is disconnected")
+	}
 }
 
 func TestParseDevicectlOutputEmpty(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 
 	"github.com/kacy/xless/internal/device"
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ var logsCmd = &cobra.Command{
 		bundleID, _ := cmd.Flags().GetString("bundle-id")
 		flags := cliFlags()
 		defaultSimulator := ""
+		processName := ""
 
 		_, cfg, _, err := loadProject(flags)
 		if err == nil {
@@ -42,6 +44,7 @@ var logsCmd = &cobra.Command{
 			if bundleID == "" {
 				bundleID = target.BundleID
 			}
+			processName = target.Name
 		} else if bundleID == "" {
 			out.Error("cannot load config for bundle id", "error", err.Error(),
 				"hint", "use --bundle-id to specify the bundle identifier directly")
@@ -69,14 +72,14 @@ var logsCmd = &cobra.Command{
 
 		out.Info("streaming logs", "device", dev.Name(), "bundle_id", bundleID)
 
-		streamLogs(cmd, dev.UDID(), bundleID, filter)
+		streamLogs(cmd, dev.UDID(), bundleID, processName, filter)
 	},
 }
 
 // streamLogs streams logs from a simulator using simctl spawn log stream.
 // this is shared between cmd/logs.go and cmd/run.go (--logs flag).
-func streamLogs(cmd *cobra.Command, udid, bundleID, filter string) {
-	predicate := buildLogPredicate(bundleID, filter)
+func streamLogs(cmd *cobra.Command, udid, bundleID, processName, filter string) {
+	predicate := buildLogPredicate(bundleID, processName, filter)
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 	defer stop()
@@ -123,8 +126,16 @@ func streamLogs(cmd *cobra.Command, udid, bundleID, filter string) {
 }
 
 // buildLogPredicate creates an NSPredicate string for log filtering.
-func buildLogPredicate(bundleID, filter string) string {
-	predicate := fmt.Sprintf("subsystem == %q", bundleID)
+func buildLogPredicate(bundleID, processName, filter string) string {
+	terms := []string{fmt.Sprintf("subsystem == %q", bundleID)}
+	if processName != "" {
+		terms = append(terms,
+			fmt.Sprintf("process == %q", processName),
+			fmt.Sprintf("senderImagePath ENDSWITH[c] %q", "/"+processName),
+		)
+	}
+
+	predicate := "(" + strings.Join(terms, " OR ") + ")"
 	if filter != "" {
 		predicate += fmt.Sprintf(" AND eventMessage CONTAINS %q", filter)
 	}

@@ -184,5 +184,5 @@ type funcStage struct {
 	fn   func(*BuildContext) error
 }
 
-func (s *funcStage) Name() string              { return s.name }
+func (s *funcStage) Name() string               { return s.name }
 func (s *funcStage) Run(bc *BuildContext) error { return s.fn(bc) }

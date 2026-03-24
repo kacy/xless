@@ -3,7 +3,9 @@ package cmd
 import (
 	"testing"
 
+	"github.com/kacy/xless/internal/build"
 	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/toolchain"
 )
 
 func TestSelectedTargetsUsesRequestedTarget(t *testing.T) {
@@ -77,5 +79,54 @@ func TestParseTemplateType(t *testing.T) {
 				t.Fatalf("template = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestResolveInitProjectValidatesNameBeforePathUse(t *testing.T) {
+	baseDir := t.TempDir()
+
+	_, _, err := resolveInitProject(baseDir, "123bad")
+	if err == nil {
+		t.Fatal("expected invalid name error")
+	}
+}
+
+func TestDeployArtifactPathSimulator(t *testing.T) {
+	bc := &build.BuildContext{
+		Platform:      toolchain.PlatformSimulator,
+		AppBundlePath: "/tmp/MyApp.app",
+	}
+
+	got, err := deployArtifactPath(bc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "/tmp/MyApp.app" {
+		t.Fatalf("artifact = %q, want %q", got, "/tmp/MyApp.app")
+	}
+}
+
+func TestDeployArtifactPathDeviceRequiresIPA(t *testing.T) {
+	bc := &build.BuildContext{
+		Platform: toolchain.PlatformDevice,
+	}
+
+	if _, err := deployArtifactPath(bc); err == nil {
+		t.Fatal("expected error when ipa is missing")
+	}
+}
+
+func TestDeployArtifactPathDeviceUsesIPA(t *testing.T) {
+	bc := &build.BuildContext{
+		Platform: toolchain.PlatformDevice,
+		IPAPath:  "/tmp/MyApp.ipa",
+	}
+
+	got, err := deployArtifactPath(bc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "/tmp/MyApp.ipa" {
+		t.Fatalf("artifact = %q, want %q", got, "/tmp/MyApp.ipa")
 	}
 }

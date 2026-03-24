@@ -116,7 +116,7 @@ func TestCreateIPAPreservesPermissions(t *testing.T) {
 	}
 
 	ipaPath := filepath.Join(tmp, "TestApp.ipa")
-	if err := createIPA(appDir, ipaPath, "TestApp.app"); err != nil {
+	if err := createIPA(appDir, ipaPath); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

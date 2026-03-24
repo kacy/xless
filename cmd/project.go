@@ -28,6 +28,10 @@ func loadProject(flags config.CLIFlags) (string, *config.ProjectConfig, *project
 		return "", nil, nil, err
 	}
 
+	for _, warning := range det.Warnings {
+		out.Warn(warning)
+	}
+
 	return dir, cfg, det, nil
 }
 

@@ -198,6 +198,28 @@ func TestScaffoldInvalidName(t *testing.T) {
 	}
 }
 
+func TestScaffoldRefusesToOverwriteGeneratedFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, "Sources", "MyApp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "Sources", "MyApp", "MyAppApp.swift"), []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Scaffold(dir, ScaffoldConfig{
+		Name:     "MyApp",
+		Template: TemplateSimple,
+	})
+	if err == nil {
+		t.Fatal("expected overwrite refusal")
+	}
+	if !strings.Contains(err.Error(), "refusing to overwrite existing file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestMajorVersion(t *testing.T) {
 	tests := []struct {
 		input string

@@ -16,10 +16,9 @@ type PackageStage struct{}
 func (PackageStage) Name() string { return "package" }
 
 func (PackageStage) Run(bc *BuildContext) error {
-	appName := filepath.Base(bc.AppBundlePath)
 	ipaPath := filepath.Join(bc.BuildDir, bc.Target.Name+".ipa")
 
-	if err := createIPA(bc.AppBundlePath, ipaPath, appName); err != nil {
+	if err := createIPA(bc.AppBundlePath, ipaPath); err != nil {
 		return &BuildError{
 			Stage: "package",
 			Err:   fmt.Errorf("cannot create IPA: %w", err),
@@ -39,7 +38,7 @@ var incompressibleExts = map[string]bool{
 }
 
 // createIPA zips the app bundle into an IPA with Payload/ prefix.
-func createIPA(appDir, ipaPath, appName string) error {
+func createIPA(appDir, ipaPath string) error {
 	if err := os.MkdirAll(filepath.Dir(ipaPath), 0o755); err != nil {
 		return err
 	}
@@ -95,10 +94,13 @@ func createIPA(appDir, ipaPath, appName string) error {
 		if err != nil {
 			return err
 		}
-		defer src.Close()
 
-		_, err = io.Copy(writer, src)
-		return err
+		_, copyErr := io.Copy(writer, src)
+		closeErr := src.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		return closeErr
 	})
 
 	// close zip writer first — this writes the central directory

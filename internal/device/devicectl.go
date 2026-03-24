@@ -10,7 +10,7 @@ import (
 	"github.com/kacy/xless/internal/toolchain"
 )
 
-// PhysicalDeviceInfo describes a connected physical iOS device.
+// PhysicalDeviceInfo describes a physical iOS device discovered via devicectl.
 type PhysicalDeviceInfo struct {
 	Name          string
 	UDID          string
@@ -20,7 +20,7 @@ type PhysicalDeviceInfo struct {
 	Connected     bool
 }
 
-// ListPhysicalDevices calls devicectl and returns connected iOS devices.
+// ListPhysicalDevices calls devicectl and returns iOS devices with connection state.
 func ListPhysicalDevices(ctx context.Context) ([]PhysicalDeviceInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, listTimeout)
 	defer cancel()
@@ -74,14 +74,14 @@ type devicectlOutput struct {
 }
 
 type devicectlDevice struct {
-	Capabilities []devicectlCapability `json:"capabilities"`
+	Capabilities     []devicectlCapability `json:"capabilities"`
 	DeviceProperties struct {
 		Name string `json:"name"`
 	} `json:"deviceProperties"`
 	HardwareProperties struct {
-		UDID        string `json:"udid"`
-		DeviceType  string `json:"deviceType"`
-		Platform    string `json:"platform"`
+		UDID       string `json:"udid"`
+		DeviceType string `json:"deviceType"`
+		Platform   string `json:"platform"`
 	} `json:"hardwareProperties"`
 	ConnectionProperties struct {
 		TransportType string `json:"transportType"`
@@ -109,8 +109,7 @@ func parseDevicectlOutput(data []byte) ([]PhysicalDeviceInfo, error) {
 			continue
 		}
 
-		connected := d.ConnectionProperties.TunnelState == "connected" ||
-			d.VisibilityClass == "default"
+		connected := d.ConnectionProperties.TunnelState == "connected"
 
 		devices = append(devices, PhysicalDeviceInfo{
 			Name:          d.DeviceProperties.Name,
@@ -130,4 +129,3 @@ func isIOSDevice(d devicectlDevice) bool {
 	platform := d.HardwareProperties.Platform
 	return platform == "iOS"
 }
-

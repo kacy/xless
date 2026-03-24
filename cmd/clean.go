@@ -25,8 +25,16 @@ var cleanCmd = &cobra.Command{
 		buildDir := filepath.Join(dir, ".build")
 
 		info, err := os.Stat(buildDir)
-		if err != nil || !info.IsDir() {
-			out.Info("nothing to clean")
+		if err != nil {
+			if os.IsNotExist(err) {
+				out.Info("nothing to clean")
+				return
+			}
+			out.Error("cannot inspect build directory", "path", buildDir, "error", err.Error())
+			return
+		}
+		if !info.IsDir() {
+			out.Error("build path is not a directory", "path", buildDir)
 			return
 		}
 

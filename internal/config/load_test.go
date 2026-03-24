@@ -317,4 +317,63 @@ overrides:
 	if cfg.Defaults.Simulator != "iPhone 15" {
 		t.Errorf("defaults.simulator = %q", cfg.Defaults.Simulator)
 	}
+	if cfg.Defaults.Config != "release" {
+		t.Errorf("defaults.config = %q, want release", cfg.Defaults.Config)
+	}
+}
+
+func TestLoadXcodeprojOverlayDefaultConfigSelectsReleaseSettings(t *testing.T) {
+	dir := t.TempDir()
+
+	xcodeprojDir := filepath.Join(dir, "SimpleApp.xcodeproj")
+	os.Mkdir(xcodeprojDir, 0o755)
+	data, err := os.ReadFile("../xcodeproj/testdata/simple.pbxproj")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	os.WriteFile(filepath.Join(xcodeprojDir, "project.pbxproj"), data, 0o644)
+
+	overlay := `
+defaults:
+  config: "release"
+`
+	os.WriteFile(filepath.Join(dir, "xless.yml"), []byte(overlay), 0o644)
+
+	cfg, _, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Targets[0].Signing.Identity != "Apple Distribution" {
+		t.Fatalf("signing.identity = %q, want release identity %q", cfg.Targets[0].Signing.Identity, "Apple Distribution")
+	}
+}
+
+func TestLoadXcodeprojOverlayWarningsSurfaced(t *testing.T) {
+	dir := t.TempDir()
+
+	xcodeprojDir := filepath.Join(dir, "SimpleApp.xcodeproj")
+	os.Mkdir(xcodeprojDir, 0o755)
+	data, err := os.ReadFile("../xcodeproj/testdata/simple.pbxproj")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+	os.WriteFile(filepath.Join(xcodeprojDir, "project.pbxproj"), data, 0o644)
+
+	overlay := `
+overrides:
+  targets:
+    MissingTarget:
+      min_ios: "18.0"
+`
+	os.WriteFile(filepath.Join(dir, "xless.yml"), []byte(overlay), 0o644)
+
+	_, det, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(det.Warnings) != 1 {
+		t.Fatalf("warnings = %v, want 1 warning", det.Warnings)
+	}
 }

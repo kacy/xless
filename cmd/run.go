@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/kacy/xless/internal/build"
 	"github.com/kacy/xless/internal/device"
 	"github.com/kacy/xless/internal/output"
 	"github.com/kacy/xless/internal/toolchain"
@@ -54,9 +56,15 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		out.Info("installing", "app", bc.AppBundlePath, "device", dev.Name())
+		artifactPath, err := deployArtifactPath(bc)
+		if err != nil {
+			out.Error(err.Error())
+			return
+		}
 
-		if err := dev.Install(cmd.Context(), bc.AppBundlePath); err != nil {
+		out.Info("installing", "artifact", artifactPath, "device", dev.Name())
+
+		if err := dev.Install(cmd.Context(), artifactPath); err != nil {
 			out.Error(err.Error())
 			return
 		}
@@ -94,7 +102,22 @@ var runCmd = &cobra.Command{
 				out.Warn("log streaming is not yet supported for physical devices")
 				return
 			}
-			streamLogs(cmd, dev.UDID(), bc.Target.BundleID, "")
+			streamLogs(cmd, dev.UDID(), bc.Target.BundleID, bc.Target.Name, "")
 		}
 	},
+}
+
+func deployArtifactPath(bc *build.BuildContext) (string, error) {
+	if bc.Platform == toolchain.PlatformDevice {
+		if bc.IPAPath == "" {
+			return "", fmt.Errorf("device deploy artifact missing: expected IPA after package stage")
+		}
+		return bc.IPAPath, nil
+	}
+
+	if bc.AppBundlePath == "" {
+		return "", fmt.Errorf("simulator deploy artifact missing: expected app bundle after bundle stage")
+	}
+
+	return bc.AppBundlePath, nil
 }

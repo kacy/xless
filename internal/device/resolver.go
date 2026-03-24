@@ -145,7 +145,7 @@ func resolvePhysicalFromList(devices []PhysicalDeviceInfo, specifier, defaultNam
 	// 3. try defaultName from config
 	if defaultName != "" {
 		for _, d := range devices {
-			if strings.EqualFold(d.Name, defaultName) {
+			if strings.EqualFold(d.Name, defaultName) && d.Connected {
 				return NewPhysicalDevice(d), nil
 			}
 		}

@@ -197,12 +197,22 @@ func TestResolvePhysicalNotFound(t *testing.T) {
 }
 
 func TestResolvePhysicalDefault(t *testing.T) {
+	d, err := resolvePhysicalFromList(testPhysicalDevices, "", "Kacy's iPhone")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone, got %s", d.Name())
+	}
+}
+
+func TestResolvePhysicalDisconnectedDefaultFallsThroughToConnected(t *testing.T) {
 	d, err := resolvePhysicalFromList(testPhysicalDevices, "", "Kacy's iPad")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if d.Name() != "Kacy's iPad" {
-		t.Errorf("expected Kacy's iPad, got %s", d.Name())
+	if d.Name() != "Kacy's iPhone" {
+		t.Errorf("expected Kacy's iPhone (connected fallback), got %s", d.Name())
 	}
 }
 

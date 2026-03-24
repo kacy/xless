@@ -17,9 +17,14 @@ func NewPhysicalDevice(info PhysicalDeviceInfo) *PhysicalDevice {
 	return &PhysicalDevice{info: info}
 }
 
-func (d *PhysicalDevice) Name() string    { return d.info.Name }
-func (d *PhysicalDevice) UDID() string    { return d.info.UDID }
-func (d *PhysicalDevice) State() string   { if d.info.Connected { return "Connected" }; return "Disconnected" }
+func (d *PhysicalDevice) Name() string { return d.info.Name }
+func (d *PhysicalDevice) UDID() string { return d.info.UDID }
+func (d *PhysicalDevice) State() string {
+	if d.info.Connected {
+		return "Connected"
+	}
+	return "Disconnected"
+}
 func (d *PhysicalDevice) Runtime() string { return d.info.OSVersion }
 
 // Prepare is a no-op for physical devices — they're already booted.

@@ -54,7 +54,7 @@ func (CompileStage) Run(bc *BuildContext) error {
 
 	bc.Out.Info("compile", "files", fmt.Sprintf("%d", len(sources)))
 
-	result, err := toolchain.RunCommand(ctx, "xcrun", args...)
+	result, err := toolchain.RunCommand(ctx, bc.Toolchain.SwiftcPath(), args...)
 	if err != nil {
 		stderr := ""
 		if result != nil {
@@ -76,7 +76,7 @@ func (CompileStage) Run(bc *BuildContext) error {
 
 // resolveSwiftFiles expands source entries into individual .swift file paths.
 // Entries ending in "/" or that are directories are walked recursively.
-// Other entries are treated as individual files.
+// Other entries are treated as individual .swift files.
 func resolveSwiftFiles(projectDir string, sources []string) ([]string, error) {
 	seen := make(map[string]bool)
 	var files []string
@@ -106,6 +106,9 @@ func resolveSwiftFiles(projectDir string, sources []string) ([]string, error) {
 				return nil, fmt.Errorf("walking source directory %q: %w", src, err)
 			}
 		} else {
+			if filepath.Ext(abs) != ".swift" {
+				return nil, fmt.Errorf("source file %q must be a .swift file", src)
+			}
 			if !seen[abs] {
 				seen[abs] = true
 				files = append(files, abs)
@@ -130,19 +133,10 @@ func buildTriple(arch string, minIOS string, platform toolchain.Platform) string
 	return triple
 }
 
-// sdkName returns the xcrun SDK name for the given platform.
-func sdkName(platform toolchain.Platform) string {
-	if platform == toolchain.PlatformDevice {
-		return "iphoneos"
-	}
-	return "iphonesimulator"
-}
-
-// buildSwiftcArgs constructs the full argument list for xcrun swiftc.
+// buildSwiftcArgs constructs the full argument list for swiftc.
 func buildSwiftcArgs(bc *BuildContext, sources []string) []string {
 	args := []string{
-		"-sdk", sdkName(bc.Platform),
-		"swiftc",
+		"-sdk", bc.Toolchain.SDKPath(bc.Platform),
 		"-target", buildTriple(bc.Toolchain.Arch(), bc.Target.MinIOS, bc.Platform),
 	}
 

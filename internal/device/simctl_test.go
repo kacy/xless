@@ -119,9 +119,9 @@ func TestParseRuntimeName(t *testing.T) {
 
 func TestParseLaunchPID(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   string
+		name  string
+		input string
+		want  string
 	}{
 		{"normal", "com.example.MyApp: 12345\n", "12345"},
 		{"no newline", "com.example.MyApp: 99999", "99999"},

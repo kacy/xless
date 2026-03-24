@@ -107,7 +107,18 @@ func loadXcodeproj(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 		return nil, err
 	}
 
+	var ov *overlayYAML
+	if det.ConfigFile != "" {
+		ov, err = loadOverlay(det.ConfigFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	configName := flags.BuildConfig
+	if configName == "" && ov != nil && ov.Defaults.Config != "" {
+		configName = ov.Defaults.Config
+	}
 	if configName == "" {
 		configName = DefaultConfig
 	}
@@ -115,12 +126,8 @@ func loadXcodeproj(det *project.DetectResult, flags CLIFlags) (*ProjectConfig, e
 	cfg := ConvertXcodeProject(xp, configName)
 
 	// apply xless.yml overlay if present
-	if det.ConfigFile != "" {
-		warnings, err := ApplyOverlay(cfg, det.ConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("applying overlay %s: %w", det.ConfigFile, err)
-		}
-		_ = warnings // caller can check via separate method if needed
+	if ov != nil {
+		det.Warnings = append(det.Warnings, applyOverlay(cfg, ov)...)
 	}
 
 	return cfg, nil

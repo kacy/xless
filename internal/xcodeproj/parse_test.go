@@ -217,4 +217,3 @@ func TestSettingFallback(t *testing.T) {
 		t.Errorf("Setting(debug, Z) = %q, want empty", v)
 	}
 }
-

@@ -201,6 +201,7 @@ func extractBuildSettings(cObj map[string]any) map[string]string {
 // resolveFileRefs follows PBXBuildFile → fileRef → PBXFileReference to get paths.
 func resolveFileRefs(raw *RawProject, buildFileIDs []string) []string {
 	var paths []string
+	groupPaths := buildGroupPaths(raw)
 
 	for _, bfID := range buildFileIDs {
 		bfObj := raw.Objects[bfID]
@@ -218,7 +219,7 @@ func resolveFileRefs(raw *RawProject, buildFileIDs []string) []string {
 			continue
 		}
 
-		path := resolveFilePath(raw, frObj)
+		path := resolveFilePath(frObj, fileRefID, groupPaths)
 		if path != "" {
 			paths = append(paths, path)
 		}
@@ -229,23 +230,28 @@ func resolveFileRefs(raw *RawProject, buildFileIDs []string) []string {
 
 // resolveFilePath builds the path for a PBXFileReference by walking up the
 // group hierarchy based on sourceTree.
-func resolveFilePath(raw *RawProject, frObj map[string]any) string {
+func resolveFilePath(frObj map[string]any, fileRefID string, groupPaths map[string]string) string {
 	path := getString(frObj, "path")
 	if path == "" {
-		return ""
+		path = getString(frObj, "name")
+		if path == "" {
+			return ""
+		}
 	}
 
 	sourceTree := getString(frObj, "sourceTree")
 
 	switch sourceTree {
 	case "<group>":
-		// path is relative to the containing group — we'd need to walk up
-		// the group tree. for now, just return the path as-is since most
-		// projects have flat or simple group structures.
+		if fullPath := groupPaths[fileRefID]; fullPath != "" {
+			return fullPath
+		}
 		return path
 	case "SOURCE_ROOT":
 		return path
 	case "<absolute>":
+		return path
+	case "SDKROOT", "BUILT_PRODUCTS_DIR":
 		return path
 	default:
 		return path
@@ -304,6 +310,9 @@ func buildGroupPaths(raw *RawProject) map[string]string {
 			}
 
 			childPath := getString(child, "path")
+			if childPath == "" {
+				childPath = getString(child, "name")
+			}
 			var fullPath string
 			if prefix != "" && childPath != "" {
 				fullPath = filepath.Join(prefix, childPath)

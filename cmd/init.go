@@ -34,24 +34,22 @@ var initCmd = &cobra.Command{
 			return
 		}
 
-		// determine project name and directory
-		var name string
+		nameArg := ""
 		if len(args) > 0 {
-			name = args[0]
-			dir = filepath.Join(dir, name)
+			nameArg = args[0]
+		}
 
-			// create directory if it doesn't exist
+		name, dir, err := resolveInitProject(dir, nameArg)
+		if err != nil {
+			out.Error(err.Error())
+			return
+		}
+
+		if nameArg != "" {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				out.Error("cannot create project directory", "error", err.Error())
 				return
 			}
-		} else {
-			name = filepath.Base(dir)
-		}
-
-		if err := project.ValidateName(name); err != nil {
-			out.Error(err.Error())
-			return
 		}
 
 		templateType, err := parseTemplateType(tmpl)
@@ -76,11 +74,8 @@ var initCmd = &cobra.Command{
 		// initialize git if possible and not already initialized
 		gitDir := filepath.Join(dir, ".git")
 		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-			if _, err := exec.LookPath("git"); err == nil {
-				gitCmd := exec.Command("git", "init", dir)
-				gitCmd.Stdout = nil
-				gitCmd.Stderr = nil
-				_ = gitCmd.Run() // silently skip if git init fails
+			if err := initGitRepo(dir); err != nil {
+				out.Warn("git init failed", "error", err.Error())
 			}
 		}
 
@@ -114,4 +109,31 @@ func parseTemplateType(name string) (project.TemplateType, error) {
 	default:
 		return "", fmt.Errorf("unknown template %q", name)
 	}
+}
+
+func resolveInitProject(baseDir, nameArg string) (string, string, error) {
+	if nameArg == "" {
+		name := filepath.Base(baseDir)
+		if err := project.ValidateName(name); err != nil {
+			return "", "", err
+		}
+		return name, baseDir, nil
+	}
+
+	if err := project.ValidateName(nameArg); err != nil {
+		return "", "", err
+	}
+
+	return nameArg, filepath.Join(baseDir, nameArg), nil
+}
+
+func initGitRepo(dir string) error {
+	if _, err := exec.LookPath("git"); err != nil {
+		return nil
+	}
+
+	gitCmd := exec.Command("git", "init", dir)
+	gitCmd.Stdout = nil
+	gitCmd.Stderr = nil
+	return gitCmd.Run()
 }

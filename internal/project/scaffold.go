@@ -93,20 +93,36 @@ func Scaffold(dir string, cfg ScaffoldConfig) (*ScaffoldResult, error) {
 		MinIOSMajor: majorVersion(cfg.MinIOS),
 	}
 
-	// create source directory
-	srcDir := filepath.Join(dir, "Sources", cfg.Name)
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		return nil, fmt.Errorf("cannot create source directory: %w", err)
-	}
-
-	result := &ScaffoldResult{Dir: dir}
-
 	// render templates
 	tmplDir := "templates/" + string(cfg.Template)
 	entries, err := templates.ReadDir(tmplDir)
 	if err != nil {
 		return nil, fmt.Errorf("template %q not found: %w", cfg.Template, err)
 	}
+
+	srcDir := filepath.Join(dir, "Sources", cfg.Name)
+	outputs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		outPath := outputPath(dir, srcDir, entry.Name(), cfg.Name)
+		if _, err := os.Stat(outPath); err == nil {
+			return nil, fmt.Errorf("refusing to overwrite existing file: %s", outPath)
+		} else if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("checking %s: %w", outPath, err)
+		}
+		outputs = append(outputs, outPath)
+	}
+
+	for _, outPath := range outputs {
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			return nil, fmt.Errorf("creating directory for %s: %w", outPath, err)
+		}
+	}
+
+	result := &ScaffoldResult{Dir: dir}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -125,10 +141,6 @@ func Scaffold(dir string, cfg ScaffoldConfig) (*ScaffoldResult, error) {
 
 		// determine output path
 		outPath := outputPath(dir, srcDir, entry.Name(), cfg.Name)
-
-		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
-			return nil, fmt.Errorf("creating directory for %s: %w", outPath, err)
-		}
 
 		f, err := os.Create(outPath)
 		if err != nil {
