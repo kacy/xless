@@ -3,8 +3,8 @@ package cmd
 import (
 	"runtime"
 
-	"github.com/kacyfortner/ios-build-cli/internal/output"
-	"github.com/kacyfortner/ios-build-cli/internal/toolchain"
+	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/toolchain"
 	"github.com/spf13/cobra"
 )
 

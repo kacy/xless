@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kacyfortner/ios-build-cli/internal/config"
-	"github.com/kacyfortner/ios-build-cli/internal/output"
-	"github.com/kacyfortner/ios-build-cli/internal/toolchain"
+	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/toolchain"
 )
 
 // BuildContext is the mutable state passed through pipeline stages.

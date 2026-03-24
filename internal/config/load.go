@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kacyfortner/ios-build-cli/internal/project"
-	"github.com/kacyfortner/ios-build-cli/internal/xcodeproj"
+	"github.com/kacy/xless/internal/project"
+	"github.com/kacy/xless/internal/xcodeproj"
 	"gopkg.in/yaml.v3"
 )
 

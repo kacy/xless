@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kacyfortner/ios-build-cli/internal/xcodeproj"
+	"github.com/kacy/xless/internal/xcodeproj"
 )
 
 func setupTestProj(t *testing.T, fixture string) string {

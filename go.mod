@@ -1,4 +1,4 @@
-module github.com/kacyfortner/ios-build-cli
+module github.com/kacy/xless
 
 go 1.25.6
 

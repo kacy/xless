@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kacyfortner/ios-build-cli/internal/config"
-	"github.com/kacyfortner/ios-build-cli/internal/toolchain"
+	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/toolchain"
 	"howett.net/plist"
 )
 

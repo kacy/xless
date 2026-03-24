@@ -3,7 +3,7 @@ package config
 import (
 	"strings"
 
-	"github.com/kacyfortner/ios-build-cli/internal/xcodeproj"
+	"github.com/kacy/xless/internal/xcodeproj"
 )
 
 // xcodeproj product type constants (mirrored here to avoid exporting from xcodeproj)

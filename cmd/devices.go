@@ -5,8 +5,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/kacyfortner/ios-build-cli/internal/device"
-	"github.com/kacyfortner/ios-build-cli/internal/output"
+	"github.com/kacy/xless/internal/device"
+	"github.com/kacy/xless/internal/output"
 	"github.com/spf13/cobra"
 )
 

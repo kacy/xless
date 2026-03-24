@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/kacyfortner/ios-build-cli/internal/output"
-	"github.com/kacyfortner/ios-build-cli/internal/project"
+	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/project"
 	"github.com/spf13/cobra"
 )
 

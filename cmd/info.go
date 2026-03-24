@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kacyfortner/ios-build-cli/internal/config"
-	"github.com/kacyfortner/ios-build-cli/internal/output"
+	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/output"
 	"github.com/spf13/cobra"
 )
 

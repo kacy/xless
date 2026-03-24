@@ -1,6 +1,6 @@
 package main
 
-import "github.com/kacyfortner/ios-build-cli/cmd"
+import "github.com/kacy/xless/cmd"
 
 var version = "dev"
 

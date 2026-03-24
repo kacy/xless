@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kacyfortner/ios-build-cli/internal/build"
-	"github.com/kacyfortner/ios-build-cli/internal/config"
-	"github.com/kacyfortner/ios-build-cli/internal/output"
-	"github.com/kacyfortner/ios-build-cli/internal/toolchain"
+	"github.com/kacy/xless/internal/build"
+	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/toolchain"
 	"github.com/spf13/cobra"
 )
 

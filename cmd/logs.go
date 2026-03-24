@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"github.com/kacyfortner/ios-build-cli/internal/config"
-	"github.com/kacyfortner/ios-build-cli/internal/device"
+	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/device"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
