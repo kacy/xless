@@ -27,9 +27,11 @@ all commands accept `--json` for structured ndjson output.
   - native `xless.yml` projects with `build.type: "simple"`
   - swift-only `.xcodeproj` apps
   - swift-only `.xcworkspace` apps that reference xcodeproj members
+  - pure-swift package dependencies from xcodeproj/workspace targets when package sources are already available locally
 - unsupported:
   - objective-c or mixed swift/objective-c targets
-  - swift package dependencies referenced from xcodeproj/workspace builds
+  - package plugins, macros, binary targets, c/c++/objective-c package targets, package resources, or package-specific build settings
+  - automatic package fetching/checkouts beyond reading `Package.resolved`
   - native `build.type: "spm"` beyond scaffolding
 
 ## project structure

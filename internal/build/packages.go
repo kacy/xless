@@ -52,7 +52,14 @@ func (PackageDependenciesStage) Run(bc *BuildContext) error {
 		}
 	}
 
-	productIndex := buildProductIndex(manifests)
+	productIndex, err := buildProductIndex(manifests)
+	if err != nil {
+		return &BuildError{
+			Stage: "packages",
+			Err:   err,
+			Hint:  "package product names must be unique across resolved dependencies",
+		}
+	}
 	buildOrder, err := packageBuildOrder(manifests, productIndex, bc.Target.Packages)
 	if err != nil {
 		return &BuildError{
@@ -99,11 +106,25 @@ type packageProduct struct {
 }
 
 type packageTargetManifest struct {
-	Name         string                    `json:"name"`
-	Type         string                    `json:"type"`
-	Path         string                    `json:"path"`
-	Sources      []string                  `json:"sources"`
-	Dependencies []packageTargetDependency `json:"dependencies"`
+	Name           string                    `json:"name"`
+	Type           string                    `json:"type"`
+	Path           string                    `json:"path"`
+	Sources        []string                  `json:"sources"`
+	Resources      []packageResource         `json:"resources"`
+	SwiftSettings  []packageSetting          `json:"swiftSettings"`
+	LinkerSettings []packageSetting          `json:"linkerSettings"`
+	CSettings      []packageSetting          `json:"cSettings"`
+	CXXSettings    []packageSetting          `json:"cxxSettings"`
+	Dependencies   []packageTargetDependency `json:"dependencies"`
+}
+
+type packageResource struct {
+	Rule string `json:"rule"`
+	Path string `json:"path"`
+}
+
+type packageSetting struct {
+	Name string `json:"name"`
 }
 
 type packageTargetDependency struct {
@@ -167,17 +188,30 @@ func resolvePackageReferenceDir(ref string, bc *BuildContext) (string, error) {
 }
 
 func remoteCheckoutCandidates(url string, bc *BuildContext) []string {
-	base := strings.TrimSuffix(filepath.Base(strings.TrimSuffix(url, "/")), ".git")
-	candidates := []string{
-		filepath.Join(bc.RootDir, "SourcePackages", "checkouts", base),
-		filepath.Join(bc.BuildDir, "SourcePackages", "checkouts", base),
+	names := []string{strings.TrimSuffix(filepath.Base(strings.TrimSuffix(url, "/")), ".git")}
+	if bc.Config != nil {
+		for _, pkg := range bc.Config.ResolvedPackages {
+			if pkg.Location == url && pkg.Identity != "" {
+				names = append(names, pkg.Identity)
+			}
+		}
 	}
-	if bc.WorkspaceDir != "" {
-		candidates = append(candidates, filepath.Join(bc.WorkspaceDir, "SourcePackages", "checkouts", base))
+	names = uniqueStrings(names)
+
+	var candidates []string
+	for _, base := range names {
+		candidates = append(candidates,
+			filepath.Join(bc.RootDir, "SourcePackages", "checkouts", base),
+			filepath.Join(bc.BuildDir, "SourcePackages", "checkouts", base),
+		)
+		if bc.WorkspaceDir != "" {
+			candidates = append(candidates, filepath.Join(bc.WorkspaceDir, "SourcePackages", "checkouts", base))
+		}
+		if bc.XcodeprojDir != "" {
+			candidates = append(candidates, filepath.Join(filepath.Dir(bc.XcodeprojDir), "SourcePackages", "checkouts", base))
+		}
 	}
-	if bc.XcodeprojDir != "" {
-		candidates = append(candidates, filepath.Join(filepath.Dir(bc.XcodeprojDir), "SourcePackages", "checkouts", base))
-	}
+
 	return uniqueStrings(candidates)
 }
 
@@ -218,14 +252,22 @@ func realDumpPackageManifest(ctx context.Context, packageDir, cacheHome, clangCa
 	return &manifest, nil
 }
 
-func buildProductIndex(manifests []packageManifestInfo) map[string]packageManifestInfo {
+func buildProductIndex(manifests []packageManifestInfo) (map[string]packageManifestInfo, error) {
 	index := make(map[string]packageManifestInfo)
 	for _, info := range manifests {
 		for _, product := range info.Manifest.Products {
+			if existing, ok := index[product.Name]; ok {
+				return nil, fmt.Errorf(
+					"duplicate package product %q from %s and %s",
+					product.Name,
+					existing.Manifest.Path,
+					info.Manifest.Path,
+				)
+			}
 			index[product.Name] = info
 		}
 	}
-	return index
+	return index, nil
 }
 
 func packageBuildOrder(manifests []packageManifestInfo, products map[string]packageManifestInfo, requiredProducts []string) ([]packageBuildItem, error) {
@@ -243,8 +285,8 @@ func packageBuildOrder(manifests []packageManifestInfo, products map[string]pack
 		if target == nil {
 			return fmt.Errorf("package %q target %q not found", manifest.Name, targetName)
 		}
-		if target.Type != "regular" {
-			return fmt.Errorf("package target %q uses unsupported type %q", target.Name, target.Type)
+		if err := validatePackageTargetSupport(target); err != nil {
+			return err
 		}
 
 		key := targetKey{packagePath: manifest.Path, targetName: target.Name}
@@ -358,6 +400,25 @@ func compilePackageTarget(bc *BuildContext, item packageBuildItem, moduleDir, li
 
 	if err := buildPackageLibrary(bc, item, sources, modulePath, libraryPath, moduleDir, cacheHome, clangCache); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validatePackageTargetSupport(target *packageTargetManifest) error {
+	if target.Type != "regular" {
+		return fmt.Errorf("package target %q uses unsupported type %q", target.Name, target.Type)
+	}
+	if len(target.Resources) > 0 {
+		return fmt.Errorf("package target %q uses resources, which xless does not bundle yet", target.Name)
+	}
+	if len(target.SwiftSettings) > 0 {
+		return fmt.Errorf("package target %q uses package swift settings, which xless does not apply yet", target.Name)
+	}
+	if len(target.LinkerSettings) > 0 {
+		return fmt.Errorf("package target %q uses package linker settings, which xless does not apply yet", target.Name)
+	}
+	if len(target.CSettings) > 0 || len(target.CXXSettings) > 0 {
+		return fmt.Errorf("package target %q uses c-family settings, which xless does not support", target.Name)
 	}
 	return nil
 }

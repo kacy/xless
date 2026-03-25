@@ -194,10 +194,19 @@ xless is currently focused on `swift-only` apps.
   - native `xless.yml` projects with `build.type: "simple"`
   - swift-only `.xcodeproj` apps
   - swift-only `.xcworkspace` apps whose member projects are xcodeproj-based
+- supported with limits:
+  - pure-swift package dependencies referenced from `.xcodeproj` / `.xcworkspace` targets when package sources are available locally
+  - sdk frameworks and sdk libraries declared in xcodeproj link phases
 - not supported yet:
   - objective-c or mixed swift/objective-c targets
-  - swift package dependencies referenced from xcodeproj/workspace targets
+  - package plugins, macros, binary targets, c/c++/objective-c package targets, package resources, or package-specific build settings
+  - automatic package fetching or checkout management beyond reading `Package.resolved`
   - native `build.type: "spm"`
+
+for package-backed xcode projects, xless currently expects:
+- local package references to exist on disk
+- remote package references to already be available under `SourcePackages/checkouts`
+- package products to be pure-swift library products that can be built as static libraries
 
 ### xless.yml overlay
 

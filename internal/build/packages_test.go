@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/swiftpm"
 	"github.com/kacy/xless/internal/toolchain"
 )
 
@@ -36,6 +37,33 @@ func TestResolvePackageReferenceDirRemoteCheckout(t *testing.T) {
 	}
 
 	bc := &BuildContext{RootDir: dir}
+	got, err := resolvePackageReferenceDir("remote https://github.com/apple/swift-collections.git", bc)
+	if err != nil {
+		t.Fatalf("resolvePackageReferenceDir: %v", err)
+	}
+	if got != checkoutDir {
+		t.Fatalf("dir = %q, want %q", got, checkoutDir)
+	}
+}
+
+func TestResolvePackageReferenceDirRemoteCheckoutUsesResolvedIdentity(t *testing.T) {
+	dir := t.TempDir()
+	checkoutDir := filepath.Join(dir, "SourcePackages", "checkouts", "swift-collections")
+	if err := os.MkdirAll(checkoutDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	bc := &BuildContext{
+		RootDir: dir,
+		Config: &config.ProjectConfig{
+			ResolvedPackages: []swiftpm.ResolvedPackage{
+				{
+					Identity: "swift-collections",
+					Location: "https://github.com/apple/swift-collections.git",
+				},
+			},
+		},
+	}
 	got, err := resolvePackageReferenceDir("remote https://github.com/apple/swift-collections.git", bc)
 	if err != nil {
 		t.Fatalf("resolvePackageReferenceDir: %v", err)
@@ -78,7 +106,11 @@ func TestPackageBuildOrder(t *testing.T) {
 		{Manifest: &weatherCore},
 		{Manifest: &weatherUI},
 	}
-	order, err := packageBuildOrder(infos, buildProductIndex(infos), []string{"WeatherUI"})
+	productIndex, err := buildProductIndex(infos)
+	if err != nil {
+		t.Fatalf("buildProductIndex: %v", err)
+	}
+	order, err := packageBuildOrder(infos, productIndex, []string{"WeatherUI"})
 	if err != nil {
 		t.Fatalf("packageBuildOrder: %v", err)
 	}
@@ -87,6 +119,90 @@ func TestPackageBuildOrder(t *testing.T) {
 	}
 	if order[0].Target.Name != "WeatherCore" || order[1].Target.Name != "WeatherUI" {
 		t.Fatalf("build order = [%s, %s]", order[0].Target.Name, order[1].Target.Name)
+	}
+}
+
+func TestBuildProductIndexRejectsDuplicateProducts(t *testing.T) {
+	infos := []packageManifestInfo{
+		{
+			Manifest: &packageManifest{
+				Path:     "/tmp/A",
+				Products: []packageProduct{{Name: "SharedKit"}},
+			},
+		},
+		{
+			Manifest: &packageManifest{
+				Path:     "/tmp/B",
+				Products: []packageProduct{{Name: "SharedKit"}},
+			},
+		},
+	}
+
+	_, err := buildProductIndex(infos)
+	if err == nil {
+		t.Fatal("expected duplicate product error")
+	}
+}
+
+func TestPackageBuildOrderRejectsTargetResources(t *testing.T) {
+	infos := []packageManifestInfo{
+		{
+			Manifest: &packageManifest{
+				Name: "WeatherUI",
+				Path: "/tmp/WeatherUI",
+				Products: []packageProduct{
+					{Name: "WeatherUI", Targets: []string{"WeatherUI"}},
+				},
+				Targets: []packageTargetManifest{
+					{
+						Name:      "WeatherUI",
+						Type:      "regular",
+						Sources:   []string{"WeatherUI.swift"},
+						Resources: []packageResource{{Rule: "process", Path: "Resources"}},
+					},
+				},
+			},
+		},
+	}
+
+	productIndex, err := buildProductIndex(infos)
+	if err != nil {
+		t.Fatalf("buildProductIndex: %v", err)
+	}
+	_, err = packageBuildOrder(infos, productIndex, []string{"WeatherUI"})
+	if err == nil || !strings.Contains(err.Error(), "uses resources") {
+		t.Fatalf("error = %v, want resource support error", err)
+	}
+}
+
+func TestPackageBuildOrderRejectsSwiftSettings(t *testing.T) {
+	infos := []packageManifestInfo{
+		{
+			Manifest: &packageManifest{
+				Name: "WeatherUI",
+				Path: "/tmp/WeatherUI",
+				Products: []packageProduct{
+					{Name: "WeatherUI", Targets: []string{"WeatherUI"}},
+				},
+				Targets: []packageTargetManifest{
+					{
+						Name:          "WeatherUI",
+						Type:          "regular",
+						Sources:       []string{"WeatherUI.swift"},
+						SwiftSettings: []packageSetting{{Name: "define"}},
+					},
+				},
+			},
+		},
+	}
+
+	productIndex, err := buildProductIndex(infos)
+	if err != nil {
+		t.Fatalf("buildProductIndex: %v", err)
+	}
+	_, err = packageBuildOrder(infos, productIndex, []string{"WeatherUI"})
+	if err == nil || !strings.Contains(err.Error(), "swift settings") {
+		t.Fatalf("error = %v, want swift settings support error", err)
 	}
 }
 
