@@ -24,7 +24,9 @@ type BuildContext struct {
 	BuildDir           string   // .build/{target_name}/
 	PackageModuleDirs  []string // additional -I paths for swift modules
 	PackageLibraryDirs []string // additional -L paths for package static libs
+	PackageFrameworks  []string // additional -framework inputs from package linker settings
 	PackageLibraries   []string // additional -l inputs for package products
+	PackageLinkerFlags []string // additional linker flags from package linker settings
 	ExecutablePath     string   // set by compiler
 	AppBundlePath      string   // set by bundler
 	IPAPath            string   // set by packager (device builds only)

@@ -165,12 +165,16 @@ func buildSwiftcArgs(bc *BuildContext, sources []string) []string {
 	for _, framework := range frameworkLinkNames(bc.Target.Frameworks) {
 		args = append(args, "-framework", framework)
 	}
+	for _, framework := range frameworkLinkNames(bc.PackageFrameworks) {
+		args = append(args, "-framework", framework)
+	}
 	for _, library := range bc.Target.Libraries {
 		args = append(args, "-l"+library)
 	}
 	for _, library := range uniqueStrings(bc.PackageLibraries) {
 		args = append(args, "-l"+library)
 	}
+	args = append(args, bc.PackageLinkerFlags...)
 
 	// output
 	args = append(args, "-emit-executable", "-o", bc.ExecutablePath)

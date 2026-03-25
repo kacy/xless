@@ -30,8 +30,8 @@ all commands accept `--json` for structured ndjson output.
   - pure-swift package dependencies from xcodeproj/workspace targets when package sources are already available locally
 - unsupported:
   - objective-c or mixed swift/objective-c targets
-  - package plugins, macros, binary targets, c/c++/objective-c package targets, package resources, or package-specific build settings
-  - automatic package fetching/checkouts beyond reading `Package.resolved`
+  - package plugins, macros, binary targets, c/c++/objective-c package targets, or package resources
+  - general package fetching/checkouts outside xcode-managed `xcodebuild -resolvePackageDependencies`
   - native `build.type: "spm"` beyond scaffolding
 
 ## project structure

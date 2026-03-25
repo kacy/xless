@@ -7,9 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/kacy/xless/internal/swiftpm"
 	"github.com/kacy/xless/internal/toolchain"
 )
+
+const packageResolutionTimeout = 5 * time.Minute
 
 type PackageDependenciesStage struct{}
 
@@ -70,6 +74,18 @@ func (PackageDependenciesStage) Run(bc *BuildContext) error {
 	}
 
 	for _, item := range buildOrder {
+		frameworks, libraries, linkerFlags, err := packageLinkerInputs(item.Target, bc.BuildConfig)
+		if err != nil {
+			return &BuildError{
+				Stage: "packages",
+				Err:   err,
+				Hint:  "package linker settings must be compatible with xless's direct swiftc linking",
+			}
+		}
+		bc.PackageFrameworks = append(bc.PackageFrameworks, frameworks...)
+		bc.PackageLibraries = append(bc.PackageLibraries, libraries...)
+		bc.PackageLinkerFlags = append(bc.PackageLinkerFlags, linkerFlags...)
+
 		if err := compilePackageTarget(bc, item, moduleDir, libraryDir, cacheHome, clangCache); err != nil {
 			return &BuildError{
 				Stage: "packages",
@@ -124,7 +140,37 @@ type packageResource struct {
 }
 
 type packageSetting struct {
-	Name string `json:"name"`
+	Name      string                   `json:"name"`
+	Value     packageSettingValue      `json:"value"`
+	Condition *packageSettingCondition `json:"condition"`
+}
+
+type packageSettingCondition struct {
+	PlatformNames []string `json:"platformNames"`
+	Config        string   `json:"config"`
+}
+
+type packageSettingValue []string
+
+func (v *packageSettingValue) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*v = nil
+		return nil
+	}
+
+	var single string
+	if err := json.Unmarshal(data, &single); err == nil {
+		*v = []string{single}
+		return nil
+	}
+
+	var multi []string
+	if err := json.Unmarshal(data, &multi); err == nil {
+		*v = multi
+		return nil
+	}
+
+	return fmt.Errorf("unsupported package setting value: %s", string(data))
 }
 
 type packageTargetDependency struct {
@@ -145,10 +191,34 @@ type packageBuildItem struct {
 
 var dumpPackageManifest = realDumpPackageManifest
 var buildPackageLibrary = realBuildPackageLibrary
+var resolvePackageDependencies = realResolvePackageDependencies
 
 func resolvePackageReferences(bc *BuildContext) ([]packageReference, error) {
 	refs := make([]packageReference, 0, len(bc.Target.PackageRefs))
+	var missingRemoteRefs []string
+
 	for _, ref := range bc.Target.PackageRefs {
+		dir, err := resolvePackageReferenceDir(ref, bc)
+		if err != nil {
+			if strings.HasPrefix(ref, "remote ") && canResolveRemotePackages(bc) {
+				missingRemoteRefs = append(missingRemoteRefs, ref)
+				continue
+			}
+			return nil, err
+		}
+		refs = append(refs, packageReference{Ref: ref, Dir: dir})
+	}
+
+	if len(missingRemoteRefs) == 0 {
+		return refs, nil
+	}
+
+	if err := resolvePackageDependencies(bc); err != nil {
+		return nil, err
+	}
+	refreshResolvedPackages(bc)
+
+	for _, ref := range missingRemoteRefs {
 		dir, err := resolvePackageReferenceDir(ref, bc)
 		if err != nil {
 			return nil, err
@@ -156,6 +226,10 @@ func resolvePackageReferences(bc *BuildContext) ([]packageReference, error) {
 		refs = append(refs, packageReference{Ref: ref, Dir: dir})
 	}
 	return refs, nil
+}
+
+func canResolveRemotePackages(bc *BuildContext) bool {
+	return bc.WorkspaceDir != "" || bc.XcodeprojDir != ""
 }
 
 func resolvePackageReferenceDir(ref string, bc *BuildContext) (string, error) {
@@ -250,6 +324,63 @@ func realDumpPackageManifest(ctx context.Context, packageDir, cacheHome, clangCa
 	}
 	manifest.Path = packageDir
 	return &manifest, nil
+}
+
+func realResolvePackageDependencies(bc *BuildContext) error {
+	ctx := bc.Ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, packageResolutionTimeout)
+		defer cancel()
+	}
+
+	args := []string{"-resolvePackageDependencies"}
+	switch {
+	case bc.WorkspaceDir != "":
+		args = append(args, "-workspace", bc.WorkspaceDir)
+	case bc.XcodeprojDir != "":
+		args = append(args, "-project", bc.XcodeprojDir)
+	default:
+		return fmt.Errorf("cannot resolve package dependencies without a workspace or xcodeproj")
+	}
+
+	result, err := toolchain.RunCommand(ctx, "xcodebuild", args...)
+	if err != nil {
+		stderr := ""
+		if result != nil {
+			stderr = strings.TrimSpace(result.Stderr)
+		}
+		if stderr != "" {
+			return fmt.Errorf("xcodebuild -resolvePackageDependencies failed:\n%s", stderr)
+		}
+		return err
+	}
+	return nil
+}
+
+func refreshResolvedPackages(bc *BuildContext) {
+	if bc.Config == nil {
+		return
+	}
+
+	resolvedPath := ""
+	switch {
+	case bc.WorkspaceDir != "":
+		resolvedPath = swiftpm.FindResolvedForWorkspace(bc.WorkspaceDir)
+	case bc.XcodeprojDir != "":
+		resolvedPath = swiftpm.FindResolvedForXcodeproj(bc.XcodeprojDir)
+	}
+	if resolvedPath == "" {
+		return
+	}
+
+	resolved, err := swiftpm.ParseResolved(resolvedPath)
+	if err != nil {
+		return
+	}
+
+	bc.Config.PackageResolvedFile = resolved.Path
+	bc.Config.ResolvedPackages = resolved.Packages
 }
 
 func buildProductIndex(manifests []packageManifestInfo) (map[string]packageManifestInfo, error) {
@@ -411,11 +542,11 @@ func validatePackageTargetSupport(target *packageTargetManifest) error {
 	if len(target.Resources) > 0 {
 		return fmt.Errorf("package target %q uses resources, which xless does not bundle yet", target.Name)
 	}
-	if len(target.SwiftSettings) > 0 {
-		return fmt.Errorf("package target %q uses package swift settings, which xless does not apply yet", target.Name)
+	if err := validatePackageSwiftSettings(target); err != nil {
+		return err
 	}
-	if len(target.LinkerSettings) > 0 {
-		return fmt.Errorf("package target %q uses package linker settings, which xless does not apply yet", target.Name)
+	if err := validatePackageLinkerSettings(target); err != nil {
+		return err
 	}
 	if len(target.CSettings) > 0 || len(target.CXXSettings) > 0 {
 		return fmt.Errorf("package target %q uses c-family settings, which xless does not support", target.Name)
@@ -431,6 +562,11 @@ func packageTargetSourceDir(packageDir string, target *packageTargetManifest) st
 }
 
 func realBuildPackageLibrary(bc *BuildContext, item packageBuildItem, sources []string, modulePath, libraryPath, moduleDir, cacheHome, clangCache string) error {
+	swiftArgs, err := packageSwiftArgs(item.Target, bc.BuildConfig)
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"-parse-as-library",
 		"-emit-library",
@@ -447,6 +583,7 @@ func realBuildPackageLibrary(bc *BuildContext, item packageBuildItem, sources []
 	} else {
 		args = append(args, "-Onone", "-g", "-DDEBUG")
 	}
+	args = append(args, swiftArgs...)
 	args = append(args, sources...)
 	args = append(args, "-o", libraryPath)
 
@@ -466,4 +603,103 @@ func realBuildPackageLibrary(bc *BuildContext, item packageBuildItem, sources []
 		return fmt.Errorf("swift package target %q failed: %w", item.Target.Name, err)
 	}
 	return nil
+}
+
+func validatePackageSwiftSettings(target *packageTargetManifest) error {
+	for _, setting := range target.SwiftSettings {
+		if !packageSettingApplies(setting, "debug") && !packageSettingApplies(setting, "release") {
+			continue
+		}
+		switch setting.Name {
+		case "define", "unsafeFlags", "enableUpcomingFeature", "enableExperimentalFeature":
+		default:
+			return fmt.Errorf("package target %q uses unsupported swift setting %q", target.Name, setting.Name)
+		}
+	}
+	return nil
+}
+
+func validatePackageLinkerSettings(target *packageTargetManifest) error {
+	for _, setting := range target.LinkerSettings {
+		if !packageSettingApplies(setting, "debug") && !packageSettingApplies(setting, "release") {
+			continue
+		}
+		switch setting.Name {
+		case "linkedFramework", "linkedLibrary", "unsafeFlags":
+		default:
+			return fmt.Errorf("package target %q uses unsupported linker setting %q", target.Name, setting.Name)
+		}
+	}
+	return nil
+}
+
+func packageSwiftArgs(target *packageTargetManifest, buildConfig string) ([]string, error) {
+	var args []string
+	for _, setting := range target.SwiftSettings {
+		if !packageSettingApplies(setting, buildConfig) {
+			continue
+		}
+		switch setting.Name {
+		case "define":
+			for _, value := range setting.Value {
+				args = append(args, "-D"+value)
+			}
+		case "unsafeFlags":
+			args = append(args, setting.Value...)
+		case "enableUpcomingFeature":
+			for _, value := range setting.Value {
+				args = append(args, "-enable-upcoming-feature", value)
+			}
+		case "enableExperimentalFeature":
+			for _, value := range setting.Value {
+				args = append(args, "-enable-experimental-feature", value)
+			}
+		default:
+			return nil, fmt.Errorf("package target %q uses unsupported swift setting %q", target.Name, setting.Name)
+		}
+	}
+	return args, nil
+}
+
+func packageLinkerInputs(target *packageTargetManifest, buildConfig string) (frameworks []string, libraries []string, linkerFlags []string, err error) {
+	for _, setting := range target.LinkerSettings {
+		if !packageSettingApplies(setting, buildConfig) {
+			continue
+		}
+		switch setting.Name {
+		case "linkedFramework":
+			for _, value := range setting.Value {
+				if strings.HasSuffix(value, ".framework") {
+					frameworks = append(frameworks, value)
+				} else {
+					frameworks = append(frameworks, value+".framework")
+				}
+			}
+		case "linkedLibrary":
+			libraries = append(libraries, setting.Value...)
+		case "unsafeFlags":
+			linkerFlags = append(linkerFlags, setting.Value...)
+		default:
+			return nil, nil, nil, fmt.Errorf("package target %q uses unsupported linker setting %q", target.Name, setting.Name)
+		}
+	}
+	return uniqueStrings(frameworks), uniqueStrings(libraries), linkerFlags, nil
+}
+
+func packageSettingApplies(setting packageSetting, buildConfig string) bool {
+	if setting.Condition == nil {
+		return true
+	}
+	if setting.Condition.Config != "" && !strings.EqualFold(setting.Condition.Config, buildConfig) {
+		return false
+	}
+	if len(setting.Condition.PlatformNames) == 0 {
+		return true
+	}
+	for _, platform := range setting.Condition.PlatformNames {
+		if strings.EqualFold(platform, "ios") {
+			return true
+		}
+	}
+	return false
 }

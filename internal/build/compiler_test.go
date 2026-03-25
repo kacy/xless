@@ -297,6 +297,27 @@ func TestBuildSwiftcArgsPackageInputs(t *testing.T) {
 	assertContainsValue(t, args, "-lWeatherCore")
 }
 
+func TestBuildSwiftcArgsPackageLinkerInputs(t *testing.T) {
+	bc := &BuildContext{
+		Platform:    toolchain.PlatformSimulator,
+		BuildConfig: "debug",
+		Toolchain:   &mockToolchain{arch: "arm64"},
+		Target: &config.TargetConfig{
+			Name:   "MyApp",
+			MinIOS: "16.0",
+		},
+		PackageFrameworks:  []string{"StoreKit.framework"},
+		PackageLinkerFlags: []string{"-ObjC"},
+		BuildDir:           ".build/MyApp",
+	}
+	bc.ExecutablePath = filepath.Join(bc.BuildDir, bc.Target.Name)
+
+	args := buildSwiftcArgs(bc, []string{"main.swift"})
+
+	assertContains(t, args, "-framework", "StoreKit")
+	assertContainsValue(t, args, "-ObjC")
+}
+
 // test helpers
 
 func writeFile(t *testing.T, path, content string) {
