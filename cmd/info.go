@@ -84,6 +84,8 @@ var infoCmd = &cobra.Command{
 		}
 		selectionMap := output.OrderedMap{
 			{Key: "target", Value: currentTarget.Name},
+			{Key: "platform", Value: string(resolvePlatform(flags))},
+			{Key: "config", Value: resolveBuildConfig(flags, cfg)},
 		}
 		if det.Mode == project.ModeNative {
 			selectionMap = append(selectionMap, output.KV{Key: "backend", Value: "native"})
