@@ -47,8 +47,6 @@ func TestXcodebuildArgsProjectDevice(t *testing.T) {
 	assertContains(t, args, "-sdk", "iphoneos")
 	assertContains(t, args, "-destination", "generic/platform=iOS")
 	assertContains(t, args, "-derivedDataPath", "/tmp/.build/App/XcodeBuild")
-	assertNotContainsValue(t, args, "SYMROOT=/tmp/.build/App/XcodeBuild/Build/Products")
-	assertNotContainsValue(t, args, "OBJROOT=/tmp/.build/App/XcodeBuild/Build/Intermediates.noindex")
 	assertNotContainsValue(t, args, "CODE_SIGNING_ALLOWED=NO")
 }
 
@@ -451,7 +449,7 @@ func TestXcodebuildTargetSettingsErrorsOnInvalidJSON(t *testing.T) {
 		Target:       &config.TargetConfig{Name: "Weather"},
 	}
 
-	_, err := xcodebuildTargetSettings(bc, xcodebuildSelector{flag: "-target", value: "Weather"})
+	_, err := xcodebuildTargetSettings(bc, xcodebuildSelector{flag: "-scheme", value: "Weather"})
 	if err == nil || !strings.Contains(err.Error(), "parsing xcodebuild build settings JSON") {
 		t.Fatalf("err = %v", err)
 	}

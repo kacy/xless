@@ -541,14 +541,7 @@ func xcodebuildArgs(bc *BuildContext, selector xcodebuildSelector) []string {
 		"-configuration", xcodebuildConfigurationName(bc.BuildConfig),
 		"-sdk", xcodebuildSDK(bc.Platform),
 	)
-	if selector.flag == "-target" {
-		args = append(args,
-			"SYMROOT="+filepath.Join(buildRoot, "Build", "Products"),
-			"OBJROOT="+filepath.Join(buildRoot, "Build", "Intermediates.noindex"),
-		)
-	} else {
-		args = append(args, "-derivedDataPath", buildRoot)
-	}
+	args = append(args, "-derivedDataPath", buildRoot)
 	args = append(args, "-clonedSourcePackagesDirPath", filepath.Join(bc.BuildDir, "SourcePackages"))
 
 	if destination := xcodebuildDestination(bc.Platform); destination != "" {

@@ -19,7 +19,7 @@ type BuildContext struct {
 	BuildConfig            string   // "debug" or "release"
 	XcodeScheme            string   // explicit scheme override for delegated xcodebuild runs
 	XcodeSchemeResolved    string   // resolved shared Xcode scheme used for delegated xcodebuild runs
-	XcodeSelectorFlag      string   // resolved xcodebuild selector flag, e.g. -scheme or -target
+	XcodeSelectorFlag      string   // resolved xcodebuild selector flag, currently always -scheme
 	XcodeSelectorValue     string   // resolved xcodebuild selector value
 	RootDir                string   // original working directory
 	WorkspaceDir           string   // selected .xcworkspace, if any
