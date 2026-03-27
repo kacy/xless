@@ -290,6 +290,53 @@ func TestLoadXcodeprojResolvedPackages(t *testing.T) {
 	}
 }
 
+func TestLoadDelegatedSmokeProjectFixture(t *testing.T) {
+	dir := filepath.Clean(filepath.Join("..", "..", "testdata", "smoke", "project", "ExampleProject"))
+
+	cfg, det, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if det.Mode != project.ModeXcodeproj {
+		t.Fatalf("mode = %v, want %v", det.Mode, project.ModeXcodeproj)
+	}
+	if len(cfg.Targets) != 1 {
+		t.Fatalf("targets = %d, want 1", len(cfg.Targets))
+	}
+	if cfg.Targets[0].Name != "ExampleProject" {
+		t.Fatalf("target name = %q", cfg.Targets[0].Name)
+	}
+	if cfg.Targets[0].BundleID != "com.example.ExampleProject" {
+		t.Fatalf("bundle id = %q", cfg.Targets[0].BundleID)
+	}
+}
+
+func TestLoadDelegatedSmokeWorkspaceFixture(t *testing.T) {
+	dir := filepath.Clean(filepath.Join("..", "..", "testdata", "smoke", "workspace", "ExampleWorkspace"))
+
+	cfg, det, err := Load(dir, CLIFlags{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if det.Mode != project.ModeWorkspace {
+		t.Fatalf("mode = %v, want %v", det.Mode, project.ModeWorkspace)
+	}
+	if det.WorkspaceDir == "" {
+		t.Fatal("expected workspace dir")
+	}
+	if len(cfg.Targets) != 1 {
+		t.Fatalf("targets = %d, want 1", len(cfg.Targets))
+	}
+	if cfg.Targets[0].Name != "WorkspaceApp" {
+		t.Fatalf("target name = %q", cfg.Targets[0].Name)
+	}
+	if cfg.Targets[0].BundleID != "com.example.WorkspaceApp" {
+		t.Fatalf("bundle id = %q", cfg.Targets[0].BundleID)
+	}
+}
+
 func TestLoadXcodeprojWithOverlay(t *testing.T) {
 	dir := t.TempDir()
 

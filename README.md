@@ -303,6 +303,15 @@ environment variables with `XLESS_` prefix are also supported (e.g., `XLESS_PLAT
 - macos with xcode installed (for sdks and simulator runtimes)
 - go 1.21+ (for building from source)
 
+## testing
+
+```sh
+go test ./...
+make smoke
+```
+
+`make smoke` builds xless locally, copies repo-owned delegated fixtures to `/tmp`, and runs real `info`, `build`, and `clean` checks against both a minimal `.xcodeproj` app and a minimal `.xcworkspace` app. it does not depend on any personal local projects.
+
 ## license
 
 mit — see [LICENSE](LICENSE) for details.
