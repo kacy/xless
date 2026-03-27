@@ -82,23 +82,9 @@ type XcodebuildBuildStage struct{}
 func (XcodebuildBuildStage) Name() string { return "xcodebuild" }
 
 func (XcodebuildBuildStage) Run(bc *BuildContext) error {
-	selector, err := resolveXcodebuildSelector(bc)
+	selector, err := resolvedOrDetectedSelector(bc)
 	if err != nil {
-		hint := "run `xcodebuild -list` to see the buildable shared schemes for this project"
-		var selectionErr *xcodebuildSelectionError
-		if errors.As(err, &selectionErr) && selectionErr.hint != "" {
-			hint = selectionErr.hint
-		}
-		return &BuildError{
-			Stage: "xcodebuild",
-			Err:   err,
-			Hint:  hint,
-		}
-	}
-	bc.XcodeSelectorFlag = selector.flag
-	bc.XcodeSelectorValue = selector.value
-	if selector.flag == "-scheme" {
-		bc.XcodeSchemeResolved = selector.value
+		return err
 	}
 
 	settings, err := xcodebuildTargetSettings(bc, selector)
@@ -119,6 +105,33 @@ func (XcodebuildBuildStage) Run(bc *BuildContext) error {
 	}
 
 	return runXcodebuildBuild(bc, selector, settings)
+}
+
+func resolvedOrDetectedSelector(bc *BuildContext) (xcodebuildSelector, error) {
+	if bc.XcodeSelectorFlag != "" && bc.XcodeSelectorValue != "" {
+		return xcodebuildSelector{flag: bc.XcodeSelectorFlag, value: bc.XcodeSelectorValue}, nil
+	}
+
+	selector, err := resolveXcodebuildSelector(bc)
+	if err != nil {
+		hint := "run `xcodebuild -list` to see the buildable shared schemes for this project"
+		var selectionErr *xcodebuildSelectionError
+		if errors.As(err, &selectionErr) && selectionErr.hint != "" {
+			hint = selectionErr.hint
+		}
+		return xcodebuildSelector{}, &BuildError{
+			Stage: "xcodebuild",
+			Err:   err,
+			Hint:  hint,
+		}
+	}
+
+	bc.XcodeSelectorFlag = selector.flag
+	bc.XcodeSelectorValue = selector.value
+	if selector.flag == "-scheme" {
+		bc.XcodeSchemeResolved = selector.value
+	}
+	return selector, nil
 }
 
 // ResolveXcodebuildSelection returns the delegated Xcode build entry xless would use.

@@ -108,15 +108,29 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, *
 	if shouldDelegateBuild(det) {
 		backend = "xcodebuild"
 	}
-	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig, "backend", backend)
 
 	if shouldDelegateBuild(det) {
+		selection, err := build.ResolveXcodebuildSelection(cmd.Context(), det.WorkspaceDir, det.XcodeprojDir, target.Name, flags.Scheme)
+		if err != nil {
+			if hint := build.XcodebuildSelectionHint(err); hint != "" {
+				out.Error("xcodebuild: "+err.Error(), "hint", hint)
+			} else {
+				out.Error("xcodebuild: " + err.Error())
+			}
+			return nil, nil, nil, false
+		}
+		bc.XcodeSchemeResolved = selection.Scheme
+		bc.XcodeSelectorFlag = selection.Flag
+		bc.XcodeSelectorValue = selection.Value
+		out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig, "backend", backend, "scheme", bc.XcodeSchemeResolved)
 		if err := build.NewPipeline(build.XcodebuildBuildStage{}).Run(bc); err != nil {
 			out.Error(err.Error())
 			return nil, nil, nil, false
 		}
 		return bc, cfg, det, true
 	}
+
+	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig, "backend", backend)
 
 	tc, err := discoverToolchain(cmd)
 	if err != nil {

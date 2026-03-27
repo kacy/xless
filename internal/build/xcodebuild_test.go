@@ -305,6 +305,51 @@ func TestXcodebuildBuildStageUsesShowBuildSettingsHint(t *testing.T) {
 	}
 }
 
+func TestXcodebuildBuildStageUsesPreResolvedSelector(t *testing.T) {
+	dir := t.TempDir()
+	derivedProduct := filepath.Join(dir, "DerivedData", "Build", "Products", "Debug-iphonesimulator", "App.app")
+	writeFile(t, filepath.Join(derivedProduct, "App"), "binary")
+	writeFile(t, filepath.Join(derivedProduct, "Info.plist"), "<plist/>")
+
+	originalRun := runXcodebuild
+	t.Cleanup(func() {
+		runXcodebuild = originalRun
+	})
+
+	callIndex := 0
+	runXcodebuild = func(_ context.Context, args ...string) (*toolchain.CommandResult, error) {
+		callIndex++
+		if callIndex == 1 {
+			stdout := `[{"target":"App","buildSettings":{"TARGET_BUILD_DIR":"` + filepath.Dir(derivedProduct) + `","FULL_PRODUCT_NAME":"App.app","TARGET_NAME":"App"}}]`
+			return &toolchain.CommandResult{Stdout: stdout}, nil
+		}
+		if !containsValue(args, "build") {
+			t.Fatalf("expected build invocation, got %v", args)
+		}
+		return &toolchain.CommandResult{}, nil
+	}
+
+	bc := &BuildContext{
+		Ctx:                 context.Background(),
+		XcodeprojDir:        filepath.Join(dir, "App.xcodeproj"),
+		BuildDir:            filepath.Join(dir, ".build", "App"),
+		BuildConfig:         "debug",
+		Platform:            toolchain.PlatformSimulator,
+		Target:              &config.TargetConfig{Name: "App"},
+		XcodeSchemeResolved: "App",
+		XcodeSelectorFlag:   "-scheme",
+		XcodeSelectorValue:  "App",
+		Out:                 noopFormatter{},
+	}
+
+	if err := (XcodebuildBuildStage{}).Run(bc); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if callIndex != 2 {
+		t.Fatalf("xcodebuild calls = %d, want 2", callIndex)
+	}
+}
+
 func TestXcodebuildBuildStageCopiesAppBundle(t *testing.T) {
 	dir := t.TempDir()
 	derivedProduct := filepath.Join(dir, "DerivedData", "Build", "Products", "Debug-iphonesimulator", "Weather.app")
