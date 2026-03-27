@@ -31,11 +31,15 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		out.Success("build complete", "bundle", bc.AppBundlePath)
+		artifactPath, err := deployArtifactPath(bc)
+		if err != nil {
+			out.Error(err.Error())
+			return
+		}
+		out.Success("build complete", "output", artifactPath)
 
 		// deploy phase — use bc.Platform which was already resolved during build
 		var dev device.Device
-		var err error
 
 		if bc.Platform == toolchain.PlatformDevice {
 			out.Info("resolving device")
@@ -52,12 +56,6 @@ var runCmd = &cobra.Command{
 		out.Info("preparing", "device", dev.Name(), "udid", dev.UDID())
 
 		if err := dev.Prepare(cmd.Context()); err != nil {
-			out.Error(err.Error())
-			return
-		}
-
-		artifactPath, err := deployArtifactPath(bc)
-		if err != nil {
 			out.Error(err.Error())
 			return
 		}
