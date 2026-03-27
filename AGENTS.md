@@ -34,7 +34,7 @@ all commands accept `--json` for structured ndjson output.
 notes:
 - project/workspace build compatibility should largely follow `xcodebuild`, not xless's native parser limitations
 - `xless info` may still surface `parsed_notes` for project/workspace targets because it reflects parser knowledge, not the full delegated build backend
-- `xless info` also reports the resolved `xcode_scheme` and `xcode_selector` xless will hand to Xcode
+- `xless info` also reports the resolved `xcode_scheme` and `xcode_selector` xless will hand to Xcode, and may include `xcode_selector_hint` when resolution fails
 - delegated `build` and `run` require a shared Xcode scheme; `--scheme` is the explicit override when target-name matching is not enough
 
 ## project structure

@@ -201,7 +201,7 @@ xless now has two build backends, and the limits depend on which one you are usi
 
 project/workspace mode still has a few xless-specific limits:
 - `xless info` is still based on xless's own parser, so it may show `parsed_notes` for features that are still buildable through `xcodebuild`
-- `xless info` reports the resolved `xcode_scheme` and `xcode_selector` xless will pass to Xcode, but parser notes and buildability are still separate concepts
+- `xless info` reports the resolved `xcode_scheme` and `xcode_selector` xless will pass to Xcode, and may include `xcode_selector_hint` when selector resolution fails
 - delegated `build` and `run` no longer fall back to raw Xcode targets; if no shared scheme matches, xless errors clearly and asks for `--scheme` or a shared scheme
 - native mode remains much narrower than delegated project/workspace mode
 

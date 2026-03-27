@@ -120,7 +120,7 @@ var runCmd = &cobra.Command{
 func deployArtifactPath(bc *build.BuildContext) (string, error) {
 	if bc.Platform == toolchain.PlatformDevice {
 		if bc.IPAPath == "" {
-			return "", fmt.Errorf("device deploy artifact missing: expected IPA after package stage")
+			return "", fmt.Errorf("device deploy artifact missing: expected IPA after delegated archive/export or native package stage")
 		}
 		return bc.IPAPath, nil
 	}

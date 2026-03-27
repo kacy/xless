@@ -150,6 +150,9 @@ var infoCmd = &cobra.Command{
 				selection, err := build.ResolveXcodebuildSelection(cmd.Context(), det.WorkspaceDir, det.XcodeprojDir, t.Name, flags.Scheme)
 				if err != nil {
 					targetMap = append(targetMap, output.KV{Key: "xcode_selector_error", Value: err.Error()})
+					if hint := build.XcodebuildSelectionHint(err); hint != "" {
+						targetMap = append(targetMap, output.KV{Key: "xcode_selector_hint", Value: hint})
+					}
 				} else {
 					if selection.Scheme != "" {
 						targetMap = append(targetMap, output.KV{Key: "xcode_scheme", Value: selection.Scheme})

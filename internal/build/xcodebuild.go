@@ -60,6 +60,14 @@ func (e *xcodebuildSelectionError) Error() string {
 	return e.message
 }
 
+func XcodebuildSelectionHint(err error) string {
+	var selectionErr *xcodebuildSelectionError
+	if errors.As(err, &selectionErr) {
+		return selectionErr.hint
+	}
+	return ""
+}
+
 type XcodebuildBuildStage struct{}
 
 func (XcodebuildBuildStage) Name() string { return "xcodebuild" }
@@ -86,10 +94,14 @@ func (XcodebuildBuildStage) Run(bc *BuildContext) error {
 
 	settings, err := xcodebuildTargetSettings(bc, selector)
 	if err != nil {
+		hint := XcodebuildSelectionHint(err)
+		if hint == "" {
+			hint = "check that the selected Xcode scheme is shared and buildable for the requested platform"
+		}
 		return &BuildError{
 			Stage: "xcodebuild",
 			Err:   err,
-			Hint:  "check that the selected target has a buildable shared scheme or matching target name",
+			Hint:  hint,
 		}
 	}
 

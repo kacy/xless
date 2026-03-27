@@ -227,6 +227,55 @@ func TestResolveXcodebuildSelectorListFailureReturnsHelpfulError(t *testing.T) {
 	if selectionErr.hint == "" {
 		t.Fatal("expected hint")
 	}
+	if got := XcodebuildSelectionHint(err); got == "" {
+		t.Fatal("expected exported selection hint")
+	}
+}
+
+func TestXcodebuildSelectionHintReturnsEmptyForOtherErrors(t *testing.T) {
+	if got := XcodebuildSelectionHint(fmt.Errorf("plain error")); got != "" {
+		t.Fatalf("hint = %q, want empty", got)
+	}
+}
+
+func TestXcodebuildBuildStageUsesShowBuildSettingsHint(t *testing.T) {
+	originalRun := runXcodebuild
+	t.Cleanup(func() {
+		runXcodebuild = originalRun
+	})
+
+	callIndex := 0
+	runXcodebuild = func(_ context.Context, _ ...string) (*toolchain.CommandResult, error) {
+		callIndex++
+		if callIndex == 1 {
+			return &toolchain.CommandResult{Stdout: `{"project":{"name":"App","targets":["Weather"],"schemes":["Weather"]}}`}, nil
+		}
+		return &toolchain.CommandResult{
+			Stderr: "xcodebuild: error: Unable to find a destination matching the provided destination specifier",
+		}, fmt.Errorf("exit status 70")
+	}
+
+	bc := &BuildContext{
+		Ctx:          context.Background(),
+		XcodeprojDir: "/tmp/App.xcodeproj",
+		BuildDir:     "/tmp/.build/App",
+		BuildConfig:  "debug",
+		Platform:     toolchain.PlatformSimulator,
+		Target:       &config.TargetConfig{Name: "Weather"},
+		Out:          noopFormatter{},
+	}
+
+	err := (XcodebuildBuildStage{}).Run(bc)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var buildErr *BuildError
+	if !errors.As(err, &buildErr) {
+		t.Fatalf("expected BuildError, got %T", err)
+	}
+	if !strings.Contains(buildErr.Hint, "destination") {
+		t.Fatalf("hint = %q", buildErr.Hint)
+	}
 }
 
 func TestXcodebuildBuildStageCopiesAppBundle(t *testing.T) {
