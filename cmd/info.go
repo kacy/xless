@@ -73,6 +73,10 @@ var infoCmd = &cobra.Command{
 			printTargetSelectionError(err)
 			return
 		}
+		var xcodeSelectionResolver *build.XcodebuildSelectionResolver
+		if det.Mode != project.ModeNative {
+			xcodeSelectionResolver = build.NewXcodebuildSelectionResolver(cmd.Context(), det.WorkspaceDir, det.XcodeprojDir, flags.Scheme)
+		}
 
 		for _, t := range targets {
 			backend := "native"
@@ -147,7 +151,7 @@ var infoCmd = &cobra.Command{
 				targetMap = append(targetMap, output.KV{Key: "source_root", Value: t.SourceRoot})
 			}
 			if backend == "xcodebuild" {
-				selection, err := build.ResolveXcodebuildSelection(cmd.Context(), det.WorkspaceDir, det.XcodeprojDir, t.Name, flags.Scheme)
+				selection, err := xcodeSelectionResolver.Resolve(t.Name)
 				if err != nil {
 					targetMap = append(targetMap, output.KV{Key: "xcode_selector_error", Value: err.Error()})
 					if hint := build.XcodebuildSelectionHint(err); hint != "" {

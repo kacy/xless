@@ -136,6 +136,35 @@ func TestResolveXcodebuildSelectionReturnsFormattedSelector(t *testing.T) {
 	}
 }
 
+func TestXcodebuildSelectionResolverCachesListing(t *testing.T) {
+	originalRun := runXcodebuild
+	t.Cleanup(func() {
+		runXcodebuild = originalRun
+	})
+
+	calls := 0
+	runXcodebuild = func(_ context.Context, _ ...string) (*toolchain.CommandResult, error) {
+		calls++
+		return &toolchain.CommandResult{Stdout: `{"project":{"name":"App","targets":["App","Widget"],"schemes":["App","Widget"]}}`}, nil
+	}
+
+	resolver := NewXcodebuildSelectionResolver(context.Background(), "", "/tmp/App.xcodeproj", "")
+	first, err := resolver.Resolve("App")
+	if err != nil {
+		t.Fatalf("Resolve(App): %v", err)
+	}
+	second, err := resolver.Resolve("Widget")
+	if err != nil {
+		t.Fatalf("Resolve(Widget): %v", err)
+	}
+	if first.Scheme != "App" || second.Scheme != "Widget" {
+		t.Fatalf("schemes = %q, %q", first.Scheme, second.Scheme)
+	}
+	if calls != 1 {
+		t.Fatalf("xcodebuild calls = %d, want 1", calls)
+	}
+}
+
 func TestResolveXcodebuildSelectorWorkspaceFallsBackToSingleScheme(t *testing.T) {
 	originalRun := runXcodebuild
 	t.Cleanup(func() {

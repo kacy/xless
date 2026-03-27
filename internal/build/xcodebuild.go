@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kacy/xless/internal/config"
 	"github.com/kacy/xless/internal/toolchain"
 )
 
@@ -36,6 +35,16 @@ type xcodebuildListGroup struct {
 type xcodebuildSelector struct {
 	flag  string
 	value string
+}
+
+type XcodebuildSelectionResolver struct {
+	ctx          context.Context
+	workspaceDir string
+	xcodeprojDir string
+	explicit     string
+	listing      *xcodebuildListGroup
+	listingErr   error
+	listingDone  bool
 }
 
 type ResolvedXcodebuildSelection struct {
@@ -114,13 +123,20 @@ func (XcodebuildBuildStage) Run(bc *BuildContext) error {
 
 // ResolveXcodebuildSelection returns the delegated Xcode build entry xless would use.
 func ResolveXcodebuildSelection(ctx context.Context, workspaceDir, xcodeprojDir, targetName, scheme string) (*ResolvedXcodebuildSelection, error) {
-	selector, err := resolveXcodebuildSelector(&BuildContext{
-		Ctx:          ctx,
-		WorkspaceDir: workspaceDir,
-		XcodeprojDir: xcodeprojDir,
-		XcodeScheme:  scheme,
-		Target:       &config.TargetConfig{Name: targetName},
-	})
+	return NewXcodebuildSelectionResolver(ctx, workspaceDir, xcodeprojDir, scheme).Resolve(targetName)
+}
+
+func NewXcodebuildSelectionResolver(ctx context.Context, workspaceDir, xcodeprojDir, scheme string) *XcodebuildSelectionResolver {
+	return &XcodebuildSelectionResolver{
+		ctx:          ctx,
+		workspaceDir: workspaceDir,
+		xcodeprojDir: xcodeprojDir,
+		explicit:     scheme,
+	}
+}
+
+func (r *XcodebuildSelectionResolver) Resolve(targetName string) (*ResolvedXcodebuildSelection, error) {
+	selector, err := r.resolve(targetName)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +149,58 @@ func ResolveXcodebuildSelection(ctx context.Context, workspaceDir, xcodeprojDir,
 		resolved.Scheme = selector.value
 	}
 	return resolved, nil
+}
+
+func (r *XcodebuildSelectionResolver) resolve(targetName string) (xcodebuildSelector, error) {
+	if r.explicit != "" {
+		return xcodebuildSelector{flag: "-scheme", value: r.explicit}, nil
+	}
+	if targetName == "" {
+		return xcodebuildSelector{}, &xcodebuildSelectionError{
+			message: "xcodebuild selection requires a target name",
+			hint:    "select a target with `--target` or configure defaults.target in xless.yml",
+		}
+	}
+
+	listing, err := r.loadListing()
+	if err != nil {
+		return xcodebuildSelector{}, err
+	}
+
+	schemes := uniqueStrings(listing.Schemes)
+	if containsString(schemes, targetName) {
+		return xcodebuildSelector{flag: "-scheme", value: targetName}, nil
+	}
+	if len(schemes) == 1 {
+		return xcodebuildSelector{flag: "-scheme", value: schemes[0]}, nil
+	}
+	container := "project"
+	if r.workspaceDir != "" {
+		container = "workspace"
+	}
+	if len(schemes) == 0 {
+		return xcodebuildSelector{}, &xcodebuildSelectionError{
+			message: fmt.Sprintf("%s has no shared Xcode schemes for target %q", container, targetName),
+			hint:    "share a scheme in Xcode with Product > Scheme > Manage Schemes, then rerun xless or pass --scheme",
+		}
+	}
+	return xcodebuildSelector{}, &xcodebuildSelectionError{
+		message: fmt.Sprintf("no shared Xcode scheme matched target %q (available shared schemes: %s)", targetName, strings.Join(schemes, ", ")),
+		hint:    "pass --scheme <name> or share a scheme whose name matches the selected target",
+	}
+}
+
+func (r *XcodebuildSelectionResolver) loadListing() (*xcodebuildListGroup, error) {
+	if r.listingDone {
+		return r.listing, r.listingErr
+	}
+	r.listingDone = true
+	r.listing, r.listingErr = xcodebuildListJSON(&BuildContext{
+		Ctx:          r.ctx,
+		WorkspaceDir: r.workspaceDir,
+		XcodeprojDir: r.xcodeprojDir,
+	})
+	return r.listing, r.listingErr
 }
 
 func runXcodebuildBuild(bc *BuildContext, selector xcodebuildSelector, settings map[string]string) error {
@@ -387,43 +455,11 @@ func findExportedIPA(exportDir string) (string, error) {
 }
 
 func resolveXcodebuildSelector(bc *BuildContext) (xcodebuildSelector, error) {
-	if bc.XcodeScheme != "" {
-		return xcodebuildSelector{flag: "-scheme", value: bc.XcodeScheme}, nil
+	targetName := ""
+	if bc.Target != nil {
+		targetName = bc.Target.Name
 	}
-	if bc.Target == nil || bc.Target.Name == "" {
-		return xcodebuildSelector{}, &xcodebuildSelectionError{
-			message: "xcodebuild selection requires a target name",
-			hint:    "select a target with `--target` or configure defaults.target in xless.yml",
-		}
-	}
-
-	listing, err := xcodebuildListJSON(bc)
-	if err != nil {
-		return xcodebuildSelector{}, err
-	}
-
-	schemes := uniqueStrings(listing.Schemes)
-
-	if containsString(schemes, bc.Target.Name) {
-		return xcodebuildSelector{flag: "-scheme", value: bc.Target.Name}, nil
-	}
-	if len(schemes) == 1 {
-		return xcodebuildSelector{flag: "-scheme", value: schemes[0]}, nil
-	}
-	container := "project"
-	if bc.WorkspaceDir != "" {
-		container = "workspace"
-	}
-	if len(schemes) == 0 {
-		return xcodebuildSelector{}, &xcodebuildSelectionError{
-			message: fmt.Sprintf("%s has no shared Xcode schemes for target %q", container, bc.Target.Name),
-			hint:    "share a scheme in Xcode with Product > Scheme > Manage Schemes, then rerun xless or pass --scheme",
-		}
-	}
-	return xcodebuildSelector{}, &xcodebuildSelectionError{
-		message: fmt.Sprintf("no shared Xcode scheme matched target %q (available shared schemes: %s)", bc.Target.Name, strings.Join(schemes, ", ")),
-		hint:    "pass --scheme <name> or share a scheme whose name matches the selected target",
-	}
+	return NewXcodebuildSelectionResolver(bc.Ctx, bc.WorkspaceDir, bc.XcodeprojDir, bc.XcodeScheme).resolve(targetName)
 }
 
 func xcodebuildListJSON(bc *BuildContext) (*xcodebuildListGroup, error) {
