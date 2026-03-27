@@ -12,7 +12,7 @@ a go cli that builds and runs ios apps without the xcode ide. native mode drives
 xless version                           # print versions
 xless info [--target <name>] [--json]   # show project config
 xless init [name] [--template simple|spm] [--bundle-id <id>] [--min-ios <ver>]
-xless build [--platform simulator|device] [--target <name>] [--scheme <name>] [--build-config debug|release]
+xless build [--platform simulator|device] [--target <name>] [--scheme <name>] [--build-config <name>]
 xless run [--platform simulator|device] [--logs] [--device <name|UDID>] [--scheme <name>]
 xless devices [--simulators] [--physical] [--booted]
 xless logs [--filter <term>] [--bundle-id <id>] [--device <name|UDID>]
@@ -108,7 +108,7 @@ environment variables: `XLESS_PLATFORM`, `XLESS_TARGET`, `XLESS_JSON`, etc.
 |---|---|---|
 | platform | simulator vs device | `--platform` |
 | target | named build product | `--target` |
-| config | debug vs release | `--build-config` |
+| config | build configuration name | `--build-config` |
 
 ## build pipeline stages
 

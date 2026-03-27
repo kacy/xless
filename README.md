@@ -256,7 +256,7 @@ defaults:
 --json          output as newline-delimited json
 --platform      simulator or device
 --target        build target name
---build-config  debug or release
+--build-config  build configuration name (for example: Debug or Release)
 --device        device name or UDID
 --verbose       enable verbose output
 --no-color      disable colored output

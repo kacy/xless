@@ -55,7 +55,7 @@ func init() {
 	rootCmd.PersistentFlags().String("platform", "", "build platform: simulator or device")
 	rootCmd.PersistentFlags().String("target", "", "build target name")
 	rootCmd.PersistentFlags().String("scheme", "", "xcode scheme name for project/workspace builds")
-	rootCmd.PersistentFlags().String("build-config", "", "build configuration: debug or release")
+	rootCmd.PersistentFlags().String("build-config", "", "build configuration name (for example: Debug or Release)")
 	rootCmd.PersistentFlags().String("device", "", "device name or UDID for deployment")
 
 	_ = viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
