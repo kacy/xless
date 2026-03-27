@@ -267,12 +267,12 @@ func xcodebuildTargetSettings(bc *BuildContext, selector xcodebuildSelector) (ma
 	if err != nil {
 		stderr := ""
 		if result != nil {
-			stderr = strings.TrimSpace(result.Stderr)
+			stderr = summarizeXcodebuildStderr(result.Stderr)
 		}
 		if stderr != "" {
 			return nil, &xcodebuildSelectionError{
-				message: fmt.Sprintf("xcodebuild -showBuildSettings failed:\n%s", stderr),
-				hint:    xcodebuildCommandHint("showBuildSettings", stderr),
+				message: fmt.Sprintf("xcodebuild -showBuildSettings failed: %s", stderr),
+				hint:    xcodebuildCommandHint("showBuildSettings", result.Stderr),
 			}
 		}
 		return nil, err
@@ -411,16 +411,16 @@ func normalizeBuiltApp(bc *BuildContext, builtProduct string) error {
 func wrapXcodebuildFailure(step string, result *toolchain.CommandResult, err error) error {
 	stderr := ""
 	if result != nil {
-		stderr = strings.TrimSpace(result.Stderr)
+		stderr = summarizeXcodebuildStderr(result.Stderr)
 	}
 	detail := fmt.Errorf("xcodebuild %s failed: %w", step, err)
 	if stderr != "" {
-		detail = fmt.Errorf("xcodebuild %s failed:\n%s: %w", step, stderr, err)
+		detail = fmt.Errorf("xcodebuild %s failed: %s: %w", step, stderr, err)
 	}
 	return &BuildError{
 		Stage: "xcodebuild",
 		Err:   detail,
-		Hint:  xcodebuildCommandHint(step, stderr),
+		Hint:  xcodebuildCommandHint(step, result.Stderr),
 	}
 }
 
@@ -490,12 +490,12 @@ func xcodebuildListJSON(bc *BuildContext) (*xcodebuildListGroup, error) {
 	if err != nil {
 		stderr := ""
 		if result != nil {
-			stderr = strings.TrimSpace(result.Stderr)
+			stderr = summarizeXcodebuildStderr(result.Stderr)
 		}
 		if stderr != "" {
 			return nil, &xcodebuildSelectionError{
-				message: fmt.Sprintf("xcodebuild -list failed:\n%s", stderr),
-				hint:    xcodebuildCommandHint("list", stderr),
+				message: fmt.Sprintf("xcodebuild -list failed: %s", stderr),
+				hint:    xcodebuildCommandHint("list", result.Stderr),
 			}
 		}
 		return nil, err
@@ -607,6 +607,35 @@ func xcodebuildCommandHint(step, stderr string) string {
 		return "check signing, provisioning, and archive export settings for the selected Xcode scheme"
 	}
 	return "run `xcodebuild -list` to verify the scheme exists and is shared"
+}
+
+func summarizeXcodebuildStderr(stderr string) string {
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "xcodebuild: error:") {
+			return line
+		}
+	}
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		if strings.Contains(line, " error: ") || strings.Contains(line, " Error Domain=") {
+			return line
+		}
+	}
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 func xcodebuildDestination(platform toolchain.Platform) string {

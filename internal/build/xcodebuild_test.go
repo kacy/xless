@@ -257,6 +257,22 @@ func TestResolveXcodebuildSelectorListFailureReturnsHelpfulError(t *testing.T) {
 	if got := XcodebuildSelectionHint(err); got == "" {
 		t.Fatal("expected exported selection hint")
 	}
+	if !strings.Contains(err.Error(), "xcodebuild: error: '/tmp/App.xcodeproj' is not a project file.") {
+		t.Fatalf("unexpected selection error: %v", err)
+	}
+}
+
+func TestSummarizeXcodebuildStderrPrefersTerminalErrorLine(t *testing.T) {
+	stderr := strings.Join([]string{
+		"2026-03-27 10:36:46.510 xcodebuild[2041:57470424]  DVTFilePathFSEvents: Failed to start fs event stream.",
+		"2026-03-27 10:36:47.062 xcodebuild[2041:57470423] Writing error result bundle to /tmp/Result.xcresult",
+		"xcodebuild: error: '/tmp/App.xcworkspace' is not a workspace file.",
+	}, "\n")
+
+	got := summarizeXcodebuildStderr(stderr)
+	if got != "xcodebuild: error: '/tmp/App.xcworkspace' is not a workspace file." {
+		t.Fatalf("summary = %q", got)
+	}
 }
 
 func TestXcodebuildSelectionHintReturnsEmptyForOtherErrors(t *testing.T) {
