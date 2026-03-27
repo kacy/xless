@@ -33,8 +33,8 @@ all commands accept `--json` for structured ndjson output.
 
 notes:
 - project/workspace build compatibility should largely follow `xcodebuild`, not xless's native parser limitations
-- `xless info` may still surface `parsed_notes` for project/workspace targets because it reflects parser knowledge, not the full delegated build backend
-- `xless info` includes a top-level `selection` block for the current build target/config/platform, and target entries may also report `xcode_scheme`, `xcode_selector`, and `xcode_selector_hint`
+- `xless info` may still surface `parser_notes` for project/workspace targets because it reflects parser knowledge, not the full delegated build backend
+- `xless info` includes a top-level `selection` block plus a delegated `delegated_build` block for project/workspace mode, and target entries may also report `xcode_scheme`, `xcode_selector`, and `xcode_selector_hint`
 - delegated `build` and `run` require a shared Xcode scheme; `--scheme` is the explicit override when target-name matching is not enough
 
 ## project structure
@@ -176,7 +176,7 @@ go test ./...
 make smoke
 ```
 
-`make smoke` runs real delegated project checks plus workspace parser/info checks against repo-owned fixtures under `testdata/smoke/`. use it when you need to verify xcodeproj / xcworkspace behavior without relying on local personal apps.
+`make smoke` runs real delegated project `info/build/clean` checks plus workspace parser/info checks against repo-owned fixtures under `testdata/smoke/`. when an available simulator exists, it also runs delegated `run` and `logs` on the project fixture. use it when you need to verify xcodeproj / xcworkspace behavior without relying on local personal apps.
 
 ## common workflows
 

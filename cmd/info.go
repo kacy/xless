@@ -14,6 +14,30 @@ func init() {
 	rootCmd.AddCommand(infoCmd)
 }
 
+func appendDelegatedSelectionStatus(data output.OrderedMap, resolver *build.XcodebuildSelectionResolver, targetName string) output.OrderedMap {
+	selection, err := resolver.Resolve(targetName)
+	if err != nil {
+		data = append(data,
+			output.KV{Key: "delegated_ready", Value: "false"},
+			output.KV{Key: "delegated_status", Value: "selection_error"},
+			output.KV{Key: "xcode_selector_error", Value: err.Error()},
+		)
+		if hint := build.XcodebuildSelectionHint(err); hint != "" {
+			data = append(data, output.KV{Key: "xcode_selector_hint", Value: hint})
+		}
+		return data
+	}
+
+	data = append(data,
+		output.KV{Key: "delegated_ready", Value: "true"},
+		output.KV{Key: "delegated_status", Value: "ready"},
+	)
+	if selection.Scheme != "" {
+		data = append(data, output.KV{Key: "xcode_scheme", Value: selection.Scheme})
+	}
+	return append(data, output.KV{Key: "xcode_selector", Value: selection.Selector()})
+}
+
 var infoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "display resolved project configuration",
@@ -91,20 +115,16 @@ var infoCmd = &cobra.Command{
 			selectionMap = append(selectionMap, output.KV{Key: "backend", Value: "native"})
 		} else {
 			selectionMap = append(selectionMap, output.KV{Key: "backend", Value: "xcodebuild"})
-			selection, err := xcodeSelectionResolver.Resolve(currentTarget.Name)
-			if err != nil {
-				selectionMap = append(selectionMap, output.KV{Key: "xcode_selector_error", Value: err.Error()})
-				if hint := build.XcodebuildSelectionHint(err); hint != "" {
-					selectionMap = append(selectionMap, output.KV{Key: "xcode_selector_hint", Value: hint})
-				}
-			} else {
-				if selection.Scheme != "" {
-					selectionMap = append(selectionMap, output.KV{Key: "xcode_scheme", Value: selection.Scheme})
-				}
-				selectionMap = append(selectionMap, output.KV{Key: "xcode_selector", Value: selection.Selector()})
-			}
+			selectionMap = appendDelegatedSelectionStatus(selectionMap, xcodeSelectionResolver, currentTarget.Name)
 		}
 		out.Data("selection", selectionMap)
+		if det.Mode != project.ModeNative {
+			delegatedMap := output.OrderedMap{
+				{Key: "backend", Value: "xcodebuild"},
+				{Key: "target", Value: currentTarget.Name},
+			}
+			out.Data("delegated_build", appendDelegatedSelectionStatus(delegatedMap, xcodeSelectionResolver, currentTarget.Name))
+		}
 
 		for _, t := range targets {
 			backend := "native"
@@ -179,23 +199,13 @@ var infoCmd = &cobra.Command{
 				targetMap = append(targetMap, output.KV{Key: "source_root", Value: t.SourceRoot})
 			}
 			if backend == "xcodebuild" {
-				selection, err := xcodeSelectionResolver.Resolve(t.Name)
-				if err != nil {
-					targetMap = append(targetMap, output.KV{Key: "xcode_selector_error", Value: err.Error()})
-					if hint := build.XcodebuildSelectionHint(err); hint != "" {
-						targetMap = append(targetMap, output.KV{Key: "xcode_selector_hint", Value: hint})
-					}
-				} else {
-					if selection.Scheme != "" {
-						targetMap = append(targetMap, output.KV{Key: "xcode_scheme", Value: selection.Scheme})
-					}
-					targetMap = append(targetMap, output.KV{Key: "xcode_selector", Value: selection.Selector()})
-				}
+				targetMap = appendDelegatedSelectionStatus(targetMap, xcodeSelectionResolver, t.Name)
 			}
 			if len(t.Unsupported) > 0 {
 				key := "unsupported"
 				if backend == "xcodebuild" {
-					key = "parsed_notes"
+					key = "parser_notes"
+					targetMap = append(targetMap, output.KV{Key: "parser_notes_scope", Value: "metadata_only"})
 				}
 				targetMap = append(targetMap, output.KV{Key: key, Value: strings.Join(t.Unsupported, "; ")})
 			}

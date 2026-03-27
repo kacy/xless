@@ -87,6 +87,8 @@ var runCmd = &cobra.Command{
 			{Key: "bundle_id", Value: bc.Target.BundleID},
 			{Key: "platform", Value: string(bc.Platform)},
 			{Key: "config", Value: bc.BuildConfig},
+			{Key: "backend", Value: buildBackendLabel(bc.WorkspaceDir != "" || bc.XcodeprojDir != "")},
+			{Key: "artifact", Value: artifactPath},
 			{Key: "device", Value: dev.Name()},
 			{Key: "udid", Value: dev.UDID()},
 			{Key: "pid", Value: pid},
@@ -94,6 +96,9 @@ var runCmd = &cobra.Command{
 		}
 		if bc.XcodeSchemeResolved != "" {
 			runData = append(runData, output.KV{Key: "scheme", Value: bc.XcodeSchemeResolved})
+		}
+		if bc.XcodeSelectorFlag != "" && bc.XcodeSelectorValue != "" {
+			runData = append(runData, output.KV{Key: "xcode_selector", Value: bc.XcodeSelectorFlag + "=" + bc.XcodeSelectorValue})
 		}
 		out.Data("run", runData)
 		if bc.XcodeSelectorFlag != "" && bc.XcodeSelectorValue != "" {
@@ -107,9 +112,11 @@ var runCmd = &cobra.Command{
 		logs, _ := cmd.Flags().GetBool("logs")
 		if logs {
 			if bc.Platform == toolchain.PlatformDevice {
-				out.Warn("log streaming is not yet supported for physical devices")
+				out.Warn("physical device log streaming is not supported yet",
+					"hint", "rerun without --logs, or use Apple's device console tools directly")
 				return
 			}
+			out.Info("streaming logs", "device", dev.Name(), "bundle_id", bc.Target.BundleID)
 			streamLogs(cmd, dev.UDID(), bc.Target.BundleID, bc.Target.Name, "")
 		}
 	},

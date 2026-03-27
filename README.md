@@ -207,8 +207,8 @@ xless now has two build backends, and the limits depend on which one you are usi
   - requires a buildable shared Xcode scheme; use `--scheme` when target-name matching is not enough
 
 project/workspace mode still has a few xless-specific limits:
-- `xless info` is still based on xless's own parser, so it may show `parsed_notes` for features that are still buildable through `xcodebuild`
-- `xless info` includes a top-level `selection` block for what xless would build right now, and target entries may also report `xcode_scheme`, `xcode_selector`, and `xcode_selector_hint`
+- `xless info` is still based on xless's own parser, so it may show `parser_notes` for features that are still buildable through `xcodebuild`
+- `xless info` includes both a general `selection` block and a delegated `delegated_build` block in project/workspace mode; target entries may also report `xcode_scheme`, `xcode_selector`, `xcode_selector_hint`, and `parser_notes`
 - delegated `build` and `run` no longer fall back to raw Xcode targets; if no shared scheme matches, xless errors clearly and asks for `--scheme` or a shared scheme
 - native mode remains much narrower than delegated project/workspace mode
 
@@ -310,7 +310,7 @@ go test ./...
 make smoke
 ```
 
-`make smoke` builds xless locally, copies repo-owned fixtures to `/tmp`, and runs real delegated `info`, `build`, and `clean` checks against a minimal `.xcodeproj` app plus parser/info checks against a minimal `.xcworkspace` fixture. it does not depend on any personal local projects.
+`make smoke` builds xless locally, copies repo-owned fixtures to `/tmp`, and runs real delegated `info`, `build`, and `clean` checks against a minimal `.xcodeproj` app plus parser/info checks against a minimal `.xcworkspace` fixture. when an available simulator device is present, it also exercises delegated `run` and `logs` on the project fixture. it does not depend on any personal local projects.
 
 ## license
 

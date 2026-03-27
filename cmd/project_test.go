@@ -143,3 +143,12 @@ func TestShouldDelegateBuild(t *testing.T) {
 		t.Fatal("expected native mode to stay on custom backend")
 	}
 }
+
+func TestBuildBackendLabel(t *testing.T) {
+	if got := buildBackendLabel(true); got != "xcodebuild" {
+		t.Fatalf("delegated backend = %q", got)
+	}
+	if got := buildBackendLabel(false); got != "native" {
+		t.Fatalf("native backend = %q", got)
+	}
+}
