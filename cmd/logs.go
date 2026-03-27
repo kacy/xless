@@ -130,14 +130,14 @@ func buildLogPredicate(bundleID, processName, filter string) string {
 	terms := []string{fmt.Sprintf("subsystem == %q", bundleID)}
 	if processName != "" {
 		terms = append(terms,
-			fmt.Sprintf("process == %q", processName),
 			fmt.Sprintf("senderImagePath ENDSWITH[c] %q", "/"+processName),
+			fmt.Sprintf("senderImagePath CONTAINS[c] %q", "/"+processName+".app/"),
 		)
 	}
 
 	predicate := "(" + strings.Join(terms, " OR ") + ")"
 	if filter != "" {
-		predicate += fmt.Sprintf(" AND eventMessage CONTAINS %q", filter)
+		predicate += fmt.Sprintf(" AND eventMessage CONTAINS[c] %q", filter)
 	}
 	return predicate
 }

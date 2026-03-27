@@ -22,7 +22,14 @@ func TestBuildLogPredicate(t *testing.T) {
 			bundleID:    "com.example.MyApp",
 			processName: "MyApp",
 			filter:      "error",
-			want:        `(subsystem == "com.example.MyApp" OR process == "MyApp" OR senderImagePath ENDSWITH[c] "/MyApp") AND eventMessage CONTAINS "error"`,
+			want:        `(subsystem == "com.example.MyApp" OR senderImagePath ENDSWITH[c] "/MyApp" OR senderImagePath CONTAINS[c] "/MyApp.app/") AND eventMessage CONTAINS[c] "error"`,
+		},
+		{
+			name:        "with process name and no filter",
+			bundleID:    "com.example.MyApp",
+			processName: "MyApp",
+			filter:      "",
+			want:        `(subsystem == "com.example.MyApp" OR senderImagePath ENDSWITH[c] "/MyApp" OR senderImagePath CONTAINS[c] "/MyApp.app/")`,
 		},
 	}
 
