@@ -26,7 +26,7 @@ var runCmd = &cobra.Command{
 		flags := cliFlags()
 
 		// build phase
-		bc, cfg, ok := buildApp(cmd)
+		bc, cfg, _, ok := buildApp(cmd)
 		if !ok {
 			return
 		}
@@ -84,7 +84,7 @@ var runCmd = &cobra.Command{
 			"time", elapsed.Round(time.Millisecond).String(),
 		)
 
-		out.Data("run", output.OrderedMap{
+		runData := output.OrderedMap{
 			{Key: "target", Value: bc.Target.Name},
 			{Key: "bundle_id", Value: bc.Target.BundleID},
 			{Key: "platform", Value: string(bc.Platform)},
@@ -93,7 +93,17 @@ var runCmd = &cobra.Command{
 			{Key: "udid", Value: dev.UDID()},
 			{Key: "pid", Value: pid},
 			{Key: "time", Value: elapsed.Round(time.Millisecond).String()},
-		})
+		}
+		if bc.XcodeSchemeResolved != "" {
+			runData = append(runData, output.KV{Key: "scheme", Value: bc.XcodeSchemeResolved})
+		}
+		out.Data("run", runData)
+		if bc.XcodeSelectorFlag != "" && bc.XcodeSelectorValue != "" {
+			out.Data("xcodebuild", output.OrderedMap{
+				{Key: "scheme", Value: bc.XcodeSchemeResolved},
+				{Key: "selector", Value: bc.XcodeSelectorFlag + "=" + bc.XcodeSelectorValue},
+			})
+		}
 
 		// stream logs if requested
 		logs, _ := cmd.Flags().GetBool("logs")

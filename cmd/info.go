@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kacy/xless/internal/build"
 	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/project"
 	"github.com/spf13/cobra"
 )
 
@@ -73,6 +75,10 @@ var infoCmd = &cobra.Command{
 		}
 
 		for _, t := range targets {
+			backend := "native"
+			if det.Mode != project.ModeNative {
+				backend = "xcodebuild"
+			}
 			targetMap := output.OrderedMap{
 				{Key: "name", Value: t.Name},
 				{Key: "bundle_id", Value: t.BundleID},
@@ -80,6 +86,7 @@ var infoCmd = &cobra.Command{
 				{Key: "min_ios", Value: t.MinIOS},
 				{Key: "version", Value: t.Version},
 				{Key: "build_number", Value: t.BuildNum},
+				{Key: "build_backend", Value: backend},
 			}
 
 			if len(t.Sources) > 0 {
@@ -139,8 +146,23 @@ var infoCmd = &cobra.Command{
 			if t.SourceRoot != "" {
 				targetMap = append(targetMap, output.KV{Key: "source_root", Value: t.SourceRoot})
 			}
+			if backend == "xcodebuild" {
+				selection, err := build.ResolveXcodebuildSelection(cmd.Context(), det.WorkspaceDir, det.XcodeprojDir, t.Name, flags.Scheme)
+				if err != nil {
+					targetMap = append(targetMap, output.KV{Key: "xcode_selector_error", Value: err.Error()})
+				} else {
+					if selection.Scheme != "" {
+						targetMap = append(targetMap, output.KV{Key: "xcode_scheme", Value: selection.Scheme})
+					}
+					targetMap = append(targetMap, output.KV{Key: "xcode_selector", Value: selection.Selector()})
+				}
+			}
 			if len(t.Unsupported) > 0 {
-				targetMap = append(targetMap, output.KV{Key: "unsupported", Value: strings.Join(t.Unsupported, "; ")})
+				key := "unsupported"
+				if backend == "xcodebuild" {
+					key = "parsed_notes"
+				}
+				targetMap = append(targetMap, output.KV{Key: key, Value: strings.Join(t.Unsupported, "; ")})
 			}
 
 			out.Data(fmt.Sprintf("target:%s", t.Name), targetMap)

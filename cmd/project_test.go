@@ -5,6 +5,7 @@ import (
 
 	"github.com/kacy/xless/internal/build"
 	"github.com/kacy/xless/internal/config"
+	"github.com/kacy/xless/internal/project"
 	"github.com/kacy/xless/internal/toolchain"
 )
 
@@ -128,5 +129,17 @@ func TestDeployArtifactPathDeviceUsesIPA(t *testing.T) {
 	}
 	if got != "/tmp/MyApp.ipa" {
 		t.Fatalf("artifact = %q, want %q", got, "/tmp/MyApp.ipa")
+	}
+}
+
+func TestShouldDelegateBuild(t *testing.T) {
+	if !shouldDelegateBuild(&project.DetectResult{Mode: project.ModeXcodeproj}) {
+		t.Fatal("expected xcodeproj mode to delegate")
+	}
+	if !shouldDelegateBuild(&project.DetectResult{Mode: project.ModeWorkspace}) {
+		t.Fatal("expected workspace mode to delegate")
+	}
+	if shouldDelegateBuild(&project.DetectResult{Mode: project.ModeNative}) {
+		t.Fatal("expected native mode to stay on custom backend")
 	}
 }

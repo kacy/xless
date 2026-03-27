@@ -7,6 +7,7 @@ import (
 	"github.com/kacy/xless/internal/build"
 	"github.com/kacy/xless/internal/config"
 	"github.com/kacy/xless/internal/output"
+	"github.com/kacy/xless/internal/project"
 	"github.com/kacy/xless/internal/toolchain"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,7 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		start := time.Now()
 
-		bc, cfg, ok := buildApp(cmd)
+		bc, cfg, det, ok := buildApp(cmd)
 		if !ok {
 			return
 		}
@@ -41,7 +42,14 @@ var buildCmd = &cobra.Command{
 			{Key: "bundle_id", Value: bc.Target.BundleID},
 			{Key: "platform", Value: string(bc.Platform)},
 			{Key: "config", Value: bc.BuildConfig},
+			{Key: "backend", Value: buildBackendLabel(shouldDelegateBuild(det))},
 			{Key: "bundle", Value: bc.AppBundlePath},
+		}
+		if bc.XcodeSchemeResolved != "" {
+			data = append(data, output.KV{Key: "scheme", Value: bc.XcodeSchemeResolved})
+		}
+		if bc.XcodeSelectorFlag != "" && bc.XcodeSelectorValue != "" {
+			data = append(data, output.KV{Key: "xcode_selector", Value: bc.XcodeSelectorFlag + "=" + bc.XcodeSelectorValue})
 		}
 		if bc.IPAPath != "" {
 			data = append(data, output.KV{Key: "ipa", Value: bc.IPAPath})
@@ -54,54 +62,67 @@ var buildCmd = &cobra.Command{
 // buildApp runs the standard build pipeline (compile → bundle → sign).
 // returns the build context, loaded config, and true on success.
 // on failure, errors are printed to out and false is returned.
-func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, bool) {
+func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, *project.DetectResult, bool) {
 	flags := cliFlags()
 	dir, cfg, det, err := loadProject(flags)
 	if err != nil {
 		out.Error(err.Error())
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 
 	target, err := selectedTarget(cfg, flags)
 	if err != nil {
 		printTargetSelectionError(err)
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
-	if err := config.ValidateTargetSupport(target); err != nil {
-		out.Error(err.Error())
-		return nil, nil, false
+	if det.Mode == project.ModeNative {
+		if err := config.ValidateTargetSupport(target); err != nil {
+			out.Error(err.Error())
+			return nil, nil, nil, false
+		}
 	}
 
 	platform := resolvePlatform(flags)
 	buildConfig := resolveBuildConfig(flags, cfg)
-
-	tc, err := discoverToolchain(cmd)
-	if err != nil {
-		return nil, nil, false
-	}
-
-	projectDir := dir
-	if target.SourceRoot != "" {
-		projectDir = target.SourceRoot
-	}
-
 	buildDir := filepath.Join(dir, ".build", target.Name)
 	bc := &build.BuildContext{
 		Ctx:          cmd.Context(),
 		Config:       cfg,
 		Target:       target,
-		Toolchain:    tc,
 		Platform:     platform,
 		BuildConfig:  buildConfig,
+		XcodeScheme:  flags.Scheme,
 		RootDir:      dir,
 		WorkspaceDir: det.WorkspaceDir,
 		XcodeprojDir: det.XcodeprojDir,
-		ProjectDir:   projectDir,
+		ProjectDir:   dir,
 		BuildDir:     buildDir,
 		Out:          out,
 	}
 
-	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig)
+	if target.SourceRoot != "" {
+		bc.ProjectDir = target.SourceRoot
+	}
+
+	backend := "native"
+	if shouldDelegateBuild(det) {
+		backend = "xcodebuild"
+	}
+	out.Info("build", "target", target.Name, "platform", string(platform), "config", buildConfig, "backend", backend)
+
+	if shouldDelegateBuild(det) {
+		if err := build.NewPipeline(build.XcodebuildBuildStage{}).Run(bc); err != nil {
+			out.Error(err.Error())
+			return nil, nil, nil, false
+		}
+		return bc, cfg, det, true
+	}
+
+	tc, err := discoverToolchain(cmd)
+	if err != nil {
+		return nil, nil, nil, false
+	}
+	bc.Toolchain = tc
 
 	stages := []build.Stage{
 		build.PackageDependenciesStage{},
@@ -116,10 +137,21 @@ func buildApp(cmd *cobra.Command) (*build.BuildContext, *config.ProjectConfig, b
 
 	if err := pipeline.Run(bc); err != nil {
 		out.Error(err.Error())
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 
-	return bc, cfg, true
+	return bc, cfg, det, true
+}
+
+func shouldDelegateBuild(det *project.DetectResult) bool {
+	return det != nil && (det.Mode == project.ModeWorkspace || det.Mode == project.ModeXcodeproj)
+}
+
+func buildBackendLabel(delegated bool) string {
+	if delegated {
+		return "xcodebuild"
+	}
+	return "native"
 }
 
 // resolvePlatform returns the platform from flags or defaults to simulator.

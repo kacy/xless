@@ -39,3 +39,31 @@ func TestParseWorkspaceProjects(t *testing.T) {
 		t.Fatalf("second project = %q", ws.Projects[1])
 	}
 }
+
+func TestParseWorkspaceProjectsWithAbsoluteSelfReference(t *testing.T) {
+	dir := t.TempDir()
+	workspaceDir := filepath.Join(dir, "ExampleApp.xcodeproj", "project.xcworkspace")
+	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	projectDir := filepath.Join(dir, "ExampleApp.xcodeproj")
+	contents := `<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+    <FileRef location="self:` + projectDir + `"></FileRef>
+</Workspace>`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "contents.xcworkspacedata"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	ws, err := Parse(workspaceDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ws.Projects) != 1 {
+		t.Fatalf("projects = %d, want 1", len(ws.Projects))
+	}
+	if ws.Projects[0] != projectDir {
+		t.Fatalf("project = %q, want %q", ws.Projects[0], projectDir)
+	}
+}

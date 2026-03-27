@@ -2,7 +2,7 @@
 
 build and run ios apps from the terminal. no xcode ide required.
 
-xless drives the apple toolchain directly — `swiftc`, `simctl`, `devicectl`, `codesign` — so you never need to open xcode. it can read your existing `.xcworkspace`, `.xcodeproj`, or work with its own simple config file.
+xless gives you a cleaner cli over the apple toolchain. in native mode it drives `swiftc`, `simctl`, `devicectl`, and `codesign` directly. for existing `.xcworkspace` / `.xcodeproj` apps it uses xcode's own build engine, then keeps xless in charge of target selection, output, install, launch, and logs.
 
 > xcode must be *installed* (for sdks and simulator runtimes), but you never open it.
 
@@ -78,7 +78,7 @@ the simple template creates a minimal SwiftUI app with `xless.yml`. the spm temp
 
 ### xcodeproj and workspace support
 
-xless reads your `.xcodeproj/project.pbxproj` live at build time. when a workspace is present, it reads the member xcodeproj files referenced by `contents.xcworkspacedata`. it extracts targets, build configurations, source files, signing settings, and deployment targets. no import step, no config drift.
+xless reads your `.xcodeproj/project.pbxproj` live for detection, target selection, overlays, and `info`. when a workspace is present, it reads the member xcodeproj files referenced by `contents.xcworkspacedata`. builds in project/workspace mode are delegated to `xcodebuild`, so compatibility tracks Xcode much more closely than the native `xless.yml` pipeline.
 
 ```sh
 $ xless info
@@ -104,7 +104,7 @@ xless build --target MyWidget
 
 ### building
 
-`xless build` compiles swift sources, creates a `.app` bundle with `Info.plist`, and signs for the target platform:
+`xless build` produces a signed `.app` bundle and normalizes it into `.build/<target>/`. in native mode xless runs its own compile/bundle/sign pipeline. in xcodeproj/workspace mode it delegates to `xcodebuild`, then keeps the artifact layout and output format consistent:
 
 ```sh
 $ xless build
@@ -122,7 +122,7 @@ xless build --build-config release
 xless build --platform device
 ```
 
-the build pipeline runs stages in order: **compile** (swiftc), **bundle** (.app creation + Info.plist), **sign** (codesign), and **package** (IPA, device builds only). if any stage fails, you get an error with a hint on what to fix.
+native mode runs stages in order: **compile** (swiftc), **bundle** (.app creation + Info.plist), **sign** (codesign), and **package** (IPA, device builds only). xcodeproj/workspace mode uses `xcodebuild build` for simulator builds and `xcodebuild archive` + `-exportArchive` for device builds, then xless handles normalization, install, launch, logging, and JSON output. if any stage fails, you get an error with a hint on what to fix.
 
 ### running
 
@@ -184,30 +184,31 @@ signing:
   team_id: "YOUR_TEAM_ID"
 ```
 
-the device build pipeline produces an IPA (`.ipa`) file that gets installed via `devicectl`.
+the device build pipeline produces an IPA (`.ipa`) file that gets installed via `devicectl`. in xcodeproj/workspace mode that IPA now comes from `xcodebuild -exportArchive`, not a custom zip step.
 
 ## support limits
 
-xless is currently focused on `swift-only` apps.
+xless now has two build backends, and the limits depend on which one you are using.
 
-- supported:
-  - native `xless.yml` projects with `build.type: "simple"`
-  - swift-only `.xcodeproj` apps
-  - swift-only `.xcworkspace` apps whose member projects are xcodeproj-based
-- supported with limits:
-  - pure-swift package dependencies referenced from `.xcodeproj` / `.xcworkspace` targets when package sources are available locally
-  - sdk frameworks and sdk libraries declared in xcodeproj link phases
-- not supported yet:
-  - objective-c or mixed swift/objective-c targets
-  - package plugins, macros, binary targets, c/c++/objective-c package targets, or package resources
-  - general package fetching/checkouts outside xcode-managed `xcodebuild -resolvePackageDependencies`
-  - native `build.type: "spm"`
+- native `xless.yml` mode:
+  - supports `build.type: "simple"` only
+  - is still focused on simple Swift apps
+  - does not support native `build.type: "spm"`
+- `.xcodeproj` / `.xcworkspace` mode:
+  - delegates builds to `xcodebuild`
+  - is the recommended path for real-world Apple projects, including mixed-language apps, package dependencies, resource compilation, and broader Xcode build behavior
+  - requires a buildable shared Xcode scheme; use `--scheme` when target-name matching is not enough
 
-for package-backed xcode projects, xless currently expects:
-- local package references to exist on disk
-- remote package references to be available under `SourcePackages/checkouts`, or resolvable through `xcodebuild -resolvePackageDependencies`
-- package products to be pure-swift library products that can be built as static libraries
-- only common package settings are supported today: swift defines/feature flags and linker framework/library/unsafe flags
+project/workspace mode still has a few xless-specific limits:
+- `xless info` is still based on xless's own parser, so it may show `parsed_notes` for features that are still buildable through `xcodebuild`
+- `xless info` reports the resolved `xcode_scheme` and `xcode_selector` xless will pass to Xcode, but parser notes and buildability are still separate concepts
+- delegated `build` and `run` no longer fall back to raw Xcode targets; if no shared scheme matches, xless errors clearly and asks for `--scheme` or a shared scheme
+- native mode remains much narrower than delegated project/workspace mode
+
+for delegated project/workspace builds, xless resolves the Xcode build entry in this order:
+- explicit `--scheme`
+- scheme matching the selected xless target name
+- the only available shared scheme, if there is exactly one
 
 ### xless.yml overlay
 

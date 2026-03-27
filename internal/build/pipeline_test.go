@@ -19,7 +19,7 @@ func (noopFormatter) Data(string, any)       {}
 
 var _ output.Formatter = noopFormatter{}
 
-// recordingStage records whether it ran.
+// recordingStage records if it ran.
 type recordingStage struct {
 	name string
 	ran  bool

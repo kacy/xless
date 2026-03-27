@@ -148,6 +148,32 @@ func copyResources(bc *BuildContext, appDir string) error {
 			}
 		}
 	}
+
+	for _, bundlePath := range uniqueStrings(bc.PackageResourceBundles) {
+		info, err := os.Stat(bundlePath)
+		if err != nil {
+			return &BuildError{
+				Stage: "bundle",
+				Err:   fmt.Errorf("package resource bundle %q: %w", bundlePath, err),
+				Hint:  "the package resource staging step may not have produced a bundle",
+			}
+		}
+		if !info.IsDir() {
+			return &BuildError{
+				Stage: "bundle",
+				Err:   fmt.Errorf("package resource bundle %q is not a directory", bundlePath),
+				Hint:  "package resources should be staged as .bundle directories",
+			}
+		}
+
+		dst := filepath.Join(appDir, filepath.Base(bundlePath))
+		if err := copyDir(bundlePath, dst); err != nil {
+			return &BuildError{
+				Stage: "bundle",
+				Err:   fmt.Errorf("cannot copy package resource bundle %q: %w", bundlePath, err),
+			}
+		}
+	}
 	return nil
 }
 

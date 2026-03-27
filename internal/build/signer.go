@@ -7,6 +7,8 @@ import (
 	"github.com/kacy/xless/internal/toolchain"
 )
 
+var runSignCommand = toolchain.RunCommand
+
 // SignStage runs codesign on the .app bundle.
 type SignStage struct{}
 
@@ -34,17 +36,40 @@ func (SignStage) Run(bc *BuildContext) error {
 		}
 	}
 
-	args := []string{"--force", "--sign", identity}
-
-	// attach entitlements if configured
-	if bc.Target.Signing.Entitlements != "" {
-		entPath := resolveProjectPath(bc.ProjectDir, bc.Target.Signing.Entitlements)
-		args = append(args, "--entitlements", entPath)
+	for _, bundlePath := range nestedPackageBundlePaths(bc) {
+		if err := codesignPath(bc, identity, "", bundlePath); err != nil {
+			return err
+		}
 	}
 
-	args = append(args, bc.AppBundlePath)
+	entitlements := ""
+	if bc.Target.Signing.Entitlements != "" {
+		entitlements = resolveProjectPath(bc.ProjectDir, bc.Target.Signing.Entitlements)
+	}
+	if err := codesignPath(bc, identity, entitlements, bc.AppBundlePath); err != nil {
+		return err
+	}
 
-	result, err := toolchain.RunCommand(bc.Ctx, "codesign", args...)
+	bc.Out.Info("sign", "identity", identity)
+	return nil
+}
+
+func nestedPackageBundlePaths(bc *BuildContext) []string {
+	var paths []string
+	for _, bundlePath := range uniqueStrings(bc.PackageResourceBundles) {
+		paths = append(paths, filepath.Join(bc.AppBundlePath, filepath.Base(bundlePath)))
+	}
+	return paths
+}
+
+func codesignPath(bc *BuildContext, identity, entitlements, path string) error {
+	args := []string{"--force", "--sign", identity}
+	if entitlements != "" {
+		args = append(args, "--entitlements", entitlements)
+	}
+	args = append(args, path)
+
+	result, err := runSignCommand(bc.Ctx, "codesign", args...)
 	if err != nil {
 		stderr := ""
 		if result != nil {
@@ -60,8 +85,6 @@ func (SignStage) Run(bc *BuildContext) error {
 			Hint:  "is xcode command line tools installed? run `xcode-select --install`",
 		}
 	}
-
-	bc.Out.Info("sign", "identity", identity)
 	return nil
 }
 

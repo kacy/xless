@@ -11,26 +11,31 @@ import (
 
 // BuildContext is the mutable state passed through pipeline stages.
 type BuildContext struct {
-	Ctx                context.Context
-	Config             *config.ProjectConfig
-	Target             *config.TargetConfig
-	Toolchain          toolchain.Toolchain
-	Platform           toolchain.Platform
-	BuildConfig        string   // "debug" or "release"
-	RootDir            string   // original working directory
-	WorkspaceDir       string   // selected .xcworkspace, if any
-	XcodeprojDir       string   // selected .xcodeproj, if any
-	ProjectDir         string   // working directory
-	BuildDir           string   // .build/{target_name}/
-	PackageModuleDirs  []string // additional -I paths for swift modules
-	PackageLibraryDirs []string // additional -L paths for package static libs
-	PackageFrameworks  []string // additional -framework inputs from package linker settings
-	PackageLibraries   []string // additional -l inputs for package products
-	PackageLinkerFlags []string // additional linker flags from package linker settings
-	ExecutablePath     string   // set by compiler
-	AppBundlePath      string   // set by bundler
-	IPAPath            string   // set by packager (device builds only)
-	Out                output.Formatter
+	Ctx                    context.Context
+	Config                 *config.ProjectConfig
+	Target                 *config.TargetConfig
+	Toolchain              toolchain.Toolchain
+	Platform               toolchain.Platform
+	BuildConfig            string   // "debug" or "release"
+	XcodeScheme            string   // explicit scheme override for delegated xcodebuild runs
+	XcodeSchemeResolved    string   // resolved shared Xcode scheme used for delegated xcodebuild runs
+	XcodeSelectorFlag      string   // resolved xcodebuild selector flag, e.g. -scheme or -target
+	XcodeSelectorValue     string   // resolved xcodebuild selector value
+	RootDir                string   // original working directory
+	WorkspaceDir           string   // selected .xcworkspace, if any
+	XcodeprojDir           string   // selected .xcodeproj, if any
+	ProjectDir             string   // working directory
+	BuildDir               string   // .build/{target_name}/
+	PackageModuleDirs      []string // additional -I paths for swift modules
+	PackageLibraryDirs     []string // additional -L paths for package static libs
+	PackageFrameworks      []string // additional -framework inputs from package linker settings
+	PackageLibraries       []string // additional -l inputs for package products
+	PackageLinkerFlags     []string // additional linker flags from package linker settings
+	PackageResourceBundles []string // built package resource bundles to embed in the app
+	ExecutablePath         string   // set by compiler
+	AppBundlePath          string   // set by bundler
+	IPAPath                string   // set by packager (device builds only)
+	Out                    output.Formatter
 }
 
 // Stage is a single step in the build pipeline.

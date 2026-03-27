@@ -11,6 +11,7 @@ import (
 
 	"github.com/kacy/xless/internal/swiftpm"
 	"github.com/kacy/xless/internal/toolchain"
+	"howett.net/plist"
 )
 
 const packageResolutionTimeout = 5 * time.Minute
@@ -86,12 +87,16 @@ func (PackageDependenciesStage) Run(bc *BuildContext) error {
 		bc.PackageLibraries = append(bc.PackageLibraries, libraries...)
 		bc.PackageLinkerFlags = append(bc.PackageLinkerFlags, linkerFlags...)
 
-		if err := compilePackageTarget(bc, item, moduleDir, libraryDir, cacheHome, clangCache); err != nil {
+		resourceBundle, err := compilePackageTarget(bc, item, moduleDir, libraryDir, cacheHome, clangCache)
+		if err != nil {
 			return &BuildError{
 				Stage: "packages",
 				Err:   err,
 				Hint:  "package dependencies must be pure Swift library targets",
 			}
+		}
+		if resourceBundle != "" {
+			bc.PackageResourceBundles = append(bc.PackageResourceBundles, resourceBundle)
 		}
 		bc.PackageLibraries = append(bc.PackageLibraries, item.Target.Name)
 	}
@@ -516,31 +521,39 @@ func findPackageTarget(manifest *packageManifest, name string) *packageTargetMan
 	return nil
 }
 
-func compilePackageTarget(bc *BuildContext, item packageBuildItem, moduleDir, libraryDir, cacheHome, clangCache string) error {
+func compilePackageTarget(bc *BuildContext, item packageBuildItem, moduleDir, libraryDir, cacheHome, clangCache string) (string, error) {
 	sourceDir := packageTargetSourceDir(item.Manifest.Path, item.Target)
 	var sources []string
 	for _, source := range item.Target.Sources {
 		sources = append(sources, filepath.Join(sourceDir, source))
 	}
+
+	resourceBundlePath, generatedSource, err := stagePackageResources(bc, item)
+	if err != nil {
+		return "", err
+	}
+	if generatedSource != "" {
+		sources = append(sources, generatedSource)
+	}
 	if len(sources) == 0 {
-		return fmt.Errorf("package target %q has no Swift sources", item.Target.Name)
+		return "", fmt.Errorf("package target %q has no Swift sources", item.Target.Name)
 	}
 
 	modulePath := filepath.Join(moduleDir, item.Target.Name+".swiftmodule")
 	libraryPath := filepath.Join(libraryDir, "lib"+item.Target.Name+".a")
 
 	if err := buildPackageLibrary(bc, item, sources, modulePath, libraryPath, moduleDir, cacheHome, clangCache); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return resourceBundlePath, nil
 }
 
 func validatePackageTargetSupport(target *packageTargetManifest) error {
 	if target.Type != "regular" {
 		return fmt.Errorf("package target %q uses unsupported type %q", target.Name, target.Type)
 	}
-	if len(target.Resources) > 0 {
-		return fmt.Errorf("package target %q uses resources, which xless does not bundle yet", target.Name)
+	if err := validatePackageResources(target); err != nil {
+		return err
 	}
 	if err := validatePackageSwiftSettings(target); err != nil {
 		return err
@@ -550,6 +563,25 @@ func validatePackageTargetSupport(target *packageTargetManifest) error {
 	}
 	if len(target.CSettings) > 0 || len(target.CXXSettings) > 0 {
 		return fmt.Errorf("package target %q uses c-family settings, which xless does not support", target.Name)
+	}
+	return nil
+}
+
+func validatePackageResources(target *packageTargetManifest) error {
+	for _, resource := range target.Resources {
+		switch resource.Rule {
+		case "process", "copy":
+		default:
+			return fmt.Errorf("package target %q uses unsupported resource rule %q", target.Name, resource.Rule)
+		}
+		switch strings.ToLower(filepath.Ext(resource.Path)) {
+		case ".xcassets":
+			return fmt.Errorf("package target %q uses asset catalog resource %q, which xless does not compile", target.Name, resource.Path)
+		case ".storyboard", ".xib":
+			return fmt.Errorf("package target %q uses Interface Builder resource %q, which xless does not compile", target.Name, resource.Path)
+		case ".xcdatamodel", ".xcdatamodeld":
+			return fmt.Errorf("package target %q uses Core Data resource %q, which xless does not compile", target.Name, resource.Path)
+		}
 	}
 	return nil
 }
@@ -603,6 +635,172 @@ func realBuildPackageLibrary(bc *BuildContext, item packageBuildItem, sources []
 		return fmt.Errorf("swift package target %q failed: %w", item.Target.Name, err)
 	}
 	return nil
+}
+
+func stagePackageResources(bc *BuildContext, item packageBuildItem) (bundlePath string, generatedSource string, err error) {
+	if len(item.Target.Resources) == 0 {
+		return "", "", nil
+	}
+
+	sourceDir := packageTargetSourceDir(item.Manifest.Path, item.Target)
+	bundleName := packageResourceBundleName(item.Manifest, item.Target)
+	bundlePath = filepath.Join(bc.BuildDir, "packages", "resources", bundleName)
+	if err := os.RemoveAll(bundlePath); err != nil {
+		return "", "", fmt.Errorf("clearing package resource bundle %q: %w", bundleName, err)
+	}
+	if err := os.MkdirAll(bundlePath, 0o755); err != nil {
+		return "", "", fmt.Errorf("creating package resource bundle %q: %w", bundleName, err)
+	}
+
+	for _, resource := range item.Target.Resources {
+		resourcePath := filepath.Join(sourceDir, resource.Path)
+		info, err := os.Stat(resourcePath)
+		if err != nil {
+			return "", "", fmt.Errorf("package resource %q: %w", resource.Path, err)
+		}
+		switch resource.Rule {
+		case "process":
+			if info.IsDir() {
+				if err := copyDirContents(resourcePath, bundlePath); err != nil {
+					return "", "", fmt.Errorf("processing package resource directory %q: %w", resource.Path, err)
+				}
+			} else {
+				dst := filepath.Join(bundlePath, filepath.Base(resourcePath))
+				if err := copyFile(resourcePath, dst); err != nil {
+					return "", "", fmt.Errorf("processing package resource file %q: %w", resource.Path, err)
+				}
+			}
+		case "copy":
+			dst := filepath.Join(bundlePath, filepath.Clean(resource.Path))
+			if info.IsDir() {
+				if err := copyDir(resourcePath, dst); err != nil {
+					return "", "", fmt.Errorf("copying package resource directory %q: %w", resource.Path, err)
+				}
+			} else {
+				if err := copyFile(resourcePath, dst); err != nil {
+					return "", "", fmt.Errorf("copying package resource file %q: %w", resource.Path, err)
+				}
+			}
+		default:
+			return "", "", fmt.Errorf("package target %q uses unsupported resource rule %q", item.Target.Name, resource.Rule)
+		}
+	}
+
+	if err := writePackageResourceInfoPlist(bundlePath, item.Manifest, item.Target); err != nil {
+		return "", "", err
+	}
+
+	generatedDir := filepath.Join(bc.BuildDir, "packages", "generated", item.Target.Name)
+	if err := os.MkdirAll(generatedDir, 0o755); err != nil {
+		return "", "", fmt.Errorf("creating generated source dir for package target %q: %w", item.Target.Name, err)
+	}
+	generatedSource = filepath.Join(generatedDir, "xless_package_resources.swift")
+	if err := os.WriteFile(generatedSource, []byte(packageResourceAccessorSource(bundleName)), 0o644); err != nil {
+		return "", "", fmt.Errorf("writing package resource accessor for %q: %w", item.Target.Name, err)
+	}
+	return bundlePath, generatedSource, nil
+}
+
+func writePackageResourceInfoPlist(bundlePath string, manifest *packageManifest, target *packageTargetManifest) error {
+	info := map[string]any{
+		"CFBundleName":        target.Name,
+		"CFBundlePackageType": "BNDL",
+		"CFBundleIdentifier":  fmt.Sprintf("dev.xless.package.%s.%s", bundleIdentifierComponent(manifest.Name), bundleIdentifierComponent(target.Name)),
+	}
+
+	plistPath := filepath.Join(bundlePath, "Info.plist")
+	f, err := os.Create(plistPath)
+	if err != nil {
+		return fmt.Errorf("creating package resource Info.plist for %q: %w", target.Name, err)
+	}
+	defer f.Close()
+
+	enc := plist.NewEncoder(f)
+	enc.Indent("\t")
+	if err := enc.Encode(info); err != nil {
+		return fmt.Errorf("writing package resource Info.plist for %q: %w", target.Name, err)
+	}
+	return nil
+}
+
+func packageResourceBundleName(manifest *packageManifest, target *packageTargetManifest) string {
+	return fmt.Sprintf("%s_%s.bundle", bundleNameComponent(manifest.Name), bundleNameComponent(target.Name))
+}
+
+func packageResourceAccessorSource(bundleName string) string {
+	return fmt.Sprintf(`import Foundation
+
+private final class XLESSBundleFinder {}
+
+extension Foundation.Bundle {
+    static var module: Foundation.Bundle = {
+        let bundleName = %q
+        let candidates: [URL?] = [
+            Foundation.Bundle.main.resourceURL,
+            Foundation.Bundle(for: XLESSBundleFinder.self).resourceURL,
+            Foundation.Bundle.main.bundleURL,
+            Foundation.Bundle(for: XLESSBundleFinder.self).bundleURL,
+        ]
+
+        for candidate in candidates {
+            guard let bundleURL = candidate?.appendingPathComponent(bundleName) else {
+                continue
+            }
+            if let bundle = Foundation.Bundle(url: bundleURL) {
+                return bundle
+            }
+        }
+
+        fatalError("unable to find package resource bundle \(bundleName)")
+    }()
+}
+`, bundleName)
+}
+
+func copyDirContents(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		entrySrc := filepath.Join(src, entry.Name())
+		entryDst := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			if err := copyDir(entrySrc, entryDst); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := copyFile(entrySrc, entryDst); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func bundleNameComponent(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	if b.Len() == 0 {
+		return "Package"
+	}
+	return b.String()
+}
+
+func bundleIdentifierComponent(name string) string {
+	component := strings.ToLower(bundleNameComponent(name))
+	component = strings.Trim(component, "._-")
+	if component == "" {
+		return "package"
+	}
+	return component
 }
 
 func validatePackageSwiftSettings(target *packageTargetManifest) error {

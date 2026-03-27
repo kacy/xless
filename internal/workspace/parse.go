@@ -74,14 +74,21 @@ func resolveLocation(workspaceDir, location string) string {
 	baseDir := filepath.Dir(workspaceDir)
 	switch {
 	case strings.HasPrefix(location, "group:"):
-		return filepath.Clean(filepath.Join(baseDir, strings.TrimPrefix(location, "group:")))
+		return resolveWorkspacePath(baseDir, strings.TrimPrefix(location, "group:"))
 	case strings.HasPrefix(location, "self:"):
-		return filepath.Clean(filepath.Join(baseDir, strings.TrimPrefix(location, "self:")))
+		return resolveWorkspacePath(baseDir, strings.TrimPrefix(location, "self:"))
 	case strings.HasPrefix(location, "container:"):
-		return filepath.Clean(filepath.Join(baseDir, strings.TrimPrefix(location, "container:")))
+		return resolveWorkspacePath(baseDir, strings.TrimPrefix(location, "container:"))
 	case strings.HasPrefix(location, "absolute:"):
 		return filepath.Clean(strings.TrimPrefix(location, "absolute:"))
 	default:
-		return filepath.Clean(filepath.Join(baseDir, location))
+		return resolveWorkspacePath(baseDir, location)
 	}
+}
+
+func resolveWorkspacePath(baseDir, raw string) string {
+	if filepath.IsAbs(raw) {
+		return filepath.Clean(raw)
+	}
+	return filepath.Clean(filepath.Join(baseDir, raw))
 }

@@ -4,7 +4,7 @@ this file gives llms and ai coding agents everything they need to work with xles
 
 ## what is xless
 
-a go cli that builds and runs ios apps without the xcode ide. it drives `swiftc`, `simctl`, `devicectl`, and `codesign` directly.
+a go cli that builds and runs ios apps without the xcode ide. native mode drives `swiftc`, `simctl`, `devicectl`, and `codesign` directly. xcodeproj/xcworkspace mode delegates builds to `xcodebuild` and keeps xless focused on selection, output, install, launch, and logs.
 
 ## commands
 
@@ -12,8 +12,8 @@ a go cli that builds and runs ios apps without the xcode ide. it drives `swiftc`
 xless version                           # print versions
 xless info [--target <name>] [--json]   # show project config
 xless init [name] [--template simple|spm] [--bundle-id <id>] [--min-ios <ver>]
-xless build [--platform simulator|device] [--target <name>] [--build-config debug|release]
-xless run [--platform simulator|device] [--logs] [--device <name|UDID>]
+xless build [--platform simulator|device] [--target <name>] [--scheme <name>] [--build-config debug|release]
+xless run [--platform simulator|device] [--logs] [--device <name|UDID>] [--scheme <name>]
 xless devices [--simulators] [--physical] [--booted]
 xless logs [--filter <term>] [--bundle-id <id>] [--device <name|UDID>]
 xless clean
@@ -25,14 +25,17 @@ all commands accept `--json` for structured ndjson output.
 
 - supported:
   - native `xless.yml` projects with `build.type: "simple"`
-  - swift-only `.xcodeproj` apps
-  - swift-only `.xcworkspace` apps that reference xcodeproj members
-  - pure-swift package dependencies from xcodeproj/workspace targets when package sources are already available locally
+  - `.xcodeproj` apps via delegated `xcodebuild`
+  - `.xcworkspace` apps that reference xcodeproj members via delegated `xcodebuild`
 - unsupported:
-  - objective-c or mixed swift/objective-c targets
-  - package plugins, macros, binary targets, c/c++/objective-c package targets, or package resources
-  - general package fetching/checkouts outside xcode-managed `xcodebuild -resolvePackageDependencies`
   - native `build.type: "spm"` beyond scaffolding
+  - native-mode parity with full Xcode / SwiftPM project behavior
+
+notes:
+- project/workspace build compatibility should largely follow `xcodebuild`, not xless's native parser limitations
+- `xless info` may still surface `parsed_notes` for project/workspace targets because it reflects parser knowledge, not the full delegated build backend
+- `xless info` also reports the resolved `xcode_scheme` and `xcode_selector` xless will hand to Xcode
+- delegated `build` and `run` require a shared Xcode scheme; `--scheme` is the explicit override when target-name matching is not enough
 
 ## project structure
 
@@ -109,10 +112,16 @@ environment variables: `XLESS_PLATFORM`, `XLESS_TARGET`, `XLESS_JSON`, etc.
 
 ## build pipeline stages
 
+native mode:
 1. **compile** — `swiftc` with sdk, arch, deployment target
 2. **bundle** — create `.app/`, copy executable, generate/copy `Info.plist`, copy resources
 3. **sign** — `codesign` (ad-hoc for simulator, identity+profile for device)
 4. **package** — create `.ipa` zip archive (device builds only)
+
+project/workspace mode:
+1. **xcodebuild** — delegated build using Xcode's own build engine
+2. **normalize** — copy the built `.app` into `.build/<target>/`
+3. **archive/export** — for device builds, run `xcodebuild archive` + `-exportArchive` to produce the `.ipa`
 
 ## error handling
 

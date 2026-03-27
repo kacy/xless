@@ -54,6 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().String("platform", "", "build platform: simulator or device")
 	rootCmd.PersistentFlags().String("target", "", "build target name")
+	rootCmd.PersistentFlags().String("scheme", "", "xcode scheme name for project/workspace builds")
 	rootCmd.PersistentFlags().String("build-config", "", "build configuration: debug or release")
 	rootCmd.PersistentFlags().String("device", "", "device name or UDID for deployment")
 
@@ -63,6 +64,7 @@ func init() {
 	_ = viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
 	_ = viper.BindPFlag("platform", rootCmd.PersistentFlags().Lookup("platform"))
 	_ = viper.BindPFlag("target", rootCmd.PersistentFlags().Lookup("target"))
+	_ = viper.BindPFlag("scheme", rootCmd.PersistentFlags().Lookup("scheme"))
 	_ = viper.BindPFlag("build-config", rootCmd.PersistentFlags().Lookup("build-config"))
 	_ = viper.BindPFlag("device", rootCmd.PersistentFlags().Lookup("device"))
 
@@ -75,6 +77,7 @@ func cliFlags() config.CLIFlags {
 	return config.CLIFlags{
 		Platform:    viper.GetString("platform"),
 		Target:      viper.GetString("target"),
+		Scheme:      viper.GetString("scheme"),
 		BuildConfig: viper.GetString("build-config"),
 		Device:      viper.GetString("device"),
 		ConfigPath:  viper.GetString("config"),

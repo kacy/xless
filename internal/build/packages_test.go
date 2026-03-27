@@ -144,7 +144,7 @@ func TestBuildProductIndexRejectsDuplicateProducts(t *testing.T) {
 	}
 }
 
-func TestPackageBuildOrderRejectsTargetResources(t *testing.T) {
+func TestPackageBuildOrderAcceptsTargetResources(t *testing.T) {
 	infos := []packageManifestInfo{
 		{
 			Manifest: &packageManifest{
@@ -169,9 +169,43 @@ func TestPackageBuildOrderRejectsTargetResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildProductIndex: %v", err)
 	}
+	order, err := packageBuildOrder(infos, productIndex, []string{"WeatherUI"})
+	if err != nil {
+		t.Fatalf("packageBuildOrder: %v", err)
+	}
+	if len(order) != 1 || order[0].Target.Name != "WeatherUI" {
+		t.Fatalf("build order = %+v", order)
+	}
+}
+
+func TestPackageBuildOrderRejectsUnsupportedCompiledResources(t *testing.T) {
+	infos := []packageManifestInfo{
+		{
+			Manifest: &packageManifest{
+				Name: "WeatherUI",
+				Path: "/tmp/WeatherUI",
+				Products: []packageProduct{
+					{Name: "WeatherUI", Targets: []string{"WeatherUI"}},
+				},
+				Targets: []packageTargetManifest{
+					{
+						Name:      "WeatherUI",
+						Type:      "regular",
+						Sources:   []string{"WeatherUI.swift"},
+						Resources: []packageResource{{Rule: "process", Path: "Resources/Assets.xcassets"}},
+					},
+				},
+			},
+		},
+	}
+
+	productIndex, err := buildProductIndex(infos)
+	if err != nil {
+		t.Fatalf("buildProductIndex: %v", err)
+	}
 	_, err = packageBuildOrder(infos, productIndex, []string{"WeatherUI"})
-	if err == nil || !strings.Contains(err.Error(), "uses resources") {
-		t.Fatalf("error = %v, want resource support error", err)
+	if err == nil || !strings.Contains(err.Error(), "asset catalog resource") {
+		t.Fatalf("error = %v, want compiled resource error", err)
 	}
 }
 
@@ -377,6 +411,101 @@ func TestPackageDependenciesStageRun(t *testing.T) {
 	}
 	if len(bc.PackageLibraries) != 1 || bc.PackageLibraries[0] != "WeatherCore" {
 		t.Fatalf("package libraries = %v", bc.PackageLibraries)
+	}
+}
+
+func TestCompilePackageTargetStagesResourcesAndAccessor(t *testing.T) {
+	dir := t.TempDir()
+	packageDir := filepath.Join(dir, "Packages", "WeatherUI")
+	writeFile(t, filepath.Join(packageDir, "Sources", "WeatherUI", "WeatherUI.swift"), "public struct WeatherUI {}")
+	writeFile(t, filepath.Join(packageDir, "Sources", "WeatherUI", "Resources", "theme.json"), `{"theme":"rain"}`)
+	writeFile(t, filepath.Join(packageDir, "Sources", "WeatherUI", "Fixtures", "seed.txt"), "fixture")
+
+	originalBuild := buildPackageLibrary
+	t.Cleanup(func() {
+		buildPackageLibrary = originalBuild
+	})
+
+	var capturedSources []string
+	buildPackageLibrary = func(_ *BuildContext, item packageBuildItem, sources []string, modulePath, libraryPath, _, _, _ string) error {
+		if item.Target.Name != "WeatherUI" {
+			t.Fatalf("target name = %q", item.Target.Name)
+		}
+		capturedSources = append([]string(nil), sources...)
+		if err := os.MkdirAll(filepath.Dir(modulePath), 0o755); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(libraryPath), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(modulePath, []byte("module"), 0o644); err != nil {
+			return err
+		}
+		return os.WriteFile(libraryPath, []byte("archive"), 0o644)
+	}
+
+	bc := &BuildContext{
+		Ctx:         context.Background(),
+		RootDir:     dir,
+		BuildDir:    filepath.Join(dir, ".build", "App"),
+		BuildConfig: "debug",
+		Platform:    toolchain.PlatformSimulator,
+		Toolchain:   &mockToolchain{arch: "arm64"},
+		Target: &config.TargetConfig{
+			Name:   "App",
+			MinIOS: "16.0",
+		},
+	}
+	item := packageBuildItem{
+		Manifest: &packageManifest{Name: "WeatherUI", Path: packageDir},
+		Target: &packageTargetManifest{
+			Name:    "WeatherUI",
+			Type:    "regular",
+			Path:    "Sources/WeatherUI",
+			Sources: []string{"WeatherUI.swift"},
+			Resources: []packageResource{
+				{Rule: "process", Path: "Resources"},
+				{Rule: "copy", Path: "Fixtures/seed.txt"},
+			},
+		},
+	}
+
+	bundlePath, err := compilePackageTarget(bc, item, filepath.Join(dir, ".build", "modules"), filepath.Join(dir, ".build", "lib"), filepath.Join(dir, ".build", "home"), filepath.Join(dir, ".build", "clang"))
+	if err != nil {
+		t.Fatalf("compilePackageTarget: %v", err)
+	}
+
+	if bundlePath == "" {
+		t.Fatal("expected package resource bundle path")
+	}
+	themePath := filepath.Join(bundlePath, "theme.json")
+	if data, err := os.ReadFile(themePath); err != nil || string(data) != `{"theme":"rain"}` {
+		t.Fatalf("theme bundle resource = %q, err=%v", string(data), err)
+	}
+	seedPath := filepath.Join(bundlePath, "Fixtures", "seed.txt")
+	if data, err := os.ReadFile(seedPath); err != nil || string(data) != "fixture" {
+		t.Fatalf("copied package resource = %q, err=%v", string(data), err)
+	}
+	if _, err := os.Stat(filepath.Join(bundlePath, "Info.plist")); err != nil {
+		t.Fatalf("missing bundle Info.plist: %v", err)
+	}
+
+	var accessorPath string
+	for _, source := range capturedSources {
+		if strings.HasSuffix(source, "xless_package_resources.swift") {
+			accessorPath = source
+			break
+		}
+	}
+	if accessorPath == "" {
+		t.Fatalf("captured sources missing resource accessor: %v", capturedSources)
+	}
+	data, err := os.ReadFile(accessorPath)
+	if err != nil {
+		t.Fatalf("read accessor: %v", err)
+	}
+	if !strings.Contains(string(data), "static var module") {
+		t.Fatalf("accessor source = %s", string(data))
 	}
 }
 

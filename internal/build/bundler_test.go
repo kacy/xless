@@ -232,6 +232,38 @@ func TestCopyResources(t *testing.T) {
 	}
 }
 
+func TestCopyResourcesIncludesPackageBundles(t *testing.T) {
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "MyApp.app")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("mkdir app dir: %v", err)
+	}
+
+	bundleDir := filepath.Join(dir, "WeatherUI.bundle")
+	writeFile(t, filepath.Join(bundleDir, "Info.plist"), "plist")
+	writeFile(t, filepath.Join(bundleDir, "Config", "theme.json"), `{"theme":"rain"}`)
+
+	bc := &BuildContext{
+		Ctx:                    context.Background(),
+		ProjectDir:             dir,
+		PackageResourceBundles: []string{bundleDir},
+		Target:                 &config.TargetConfig{},
+		Out:                    noopFormatter{},
+	}
+
+	if err := copyResources(bc, appDir); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(appDir, "WeatherUI.bundle", "Config", "theme.json"))
+	if err != nil {
+		t.Fatalf("package bundle resource not copied: %v", err)
+	}
+	if string(data) != `{"theme":"rain"}` {
+		t.Fatalf("package bundle resource = %q", string(data))
+	}
+}
+
 func TestCopyResourcesMissing(t *testing.T) {
 	dir := t.TempDir()
 	appDir := filepath.Join(dir, "MyApp.app")
