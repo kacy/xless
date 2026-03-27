@@ -25,6 +25,7 @@ run_fixture() {
 	fixture_name=$1
 	fixture_source=$2
 	target_name=$3
+	expected_scheme=$4
 
 	tmp_dir=$(mktemp -d "/tmp/xless-smoke-${fixture_name}.XXXXXX")
 	cleanup() {
@@ -41,16 +42,55 @@ run_fixture() {
 	echo "== ${fixture_name} =="
 	(
 		cd "$tmp_dir"
-		"$BINARY_PATH" info --target "$target_name" --json >/dev/null
-		"$BINARY_PATH" build --platform simulator --target "$target_name" --json >/dev/null
-		"$BINARY_PATH" clean --json >/dev/null
+		info_output=$("$BINARY_PATH" info --target "$target_name" --json)
+		printf '%s\n' "$info_output" | grep -q "\"message\":\"selection\""
+		printf '%s\n' "$info_output" | grep -q "\"backend\":\"xcodebuild\""
+		printf '%s\n' "$info_output" | grep -q "\"xcode_scheme\":\"$expected_scheme\""
+
+		build_output=$("$BINARY_PATH" build --platform simulator --target "$target_name" --json)
+		printf '%s\n' "$build_output" | grep -q "\"message\":\"build\""
+		printf '%s\n' "$build_output" | grep -q "\"backend\":\"xcodebuild\""
+		printf '%s\n' "$build_output" | grep -q "\"scheme\":\"$expected_scheme\""
+		test -d ".build/$target_name/$target_name.app"
+
+		clean_output=$("$BINARY_PATH" clean --json)
+		printf '%s\n' "$clean_output" | grep -q "\"message\":\"cleaned\""
 	)
 
 	cleanup
 	trap - EXIT INT TERM
 }
 
-run_fixture "project" "$ROOT_DIR/testdata/smoke/project/ExampleProject" "ExampleProject"
-run_fixture "workspace" "$ROOT_DIR/testdata/smoke/workspace/ExampleWorkspace" "WorkspaceApp"
+run_workspace_fixture() {
+	fixture_source=$1
+	target_name=$2
+
+	tmp_dir=$(mktemp -d "/tmp/xless-smoke-workspace.XXXXXX")
+	cleanup() {
+		if [ "$KEEP_FIXTURES" = "1" ]; then
+			echo "kept smoke fixture: $tmp_dir"
+			return
+		fi
+		rm -rf "$tmp_dir"
+	}
+	trap cleanup EXIT INT TERM
+
+	cp -R "$fixture_source"/. "$tmp_dir"/
+
+	echo "== workspace =="
+	(
+		cd "$tmp_dir"
+		info_output=$("$BINARY_PATH" info --target "$target_name" --json)
+		printf '%s\n' "$info_output" | grep -q "\"mode\":\"xcworkspace\""
+		printf '%s\n' "$info_output" | grep -q "\"message\":\"selection\""
+		printf '%s\n' "$info_output" | grep -q "\"backend\":\"xcodebuild\""
+	)
+
+	cleanup
+	trap - EXIT INT TERM
+}
+
+run_fixture "project" "$ROOT_DIR/testdata/smoke/project/ExampleProject" "ExampleProject" "ExampleProject"
+run_workspace_fixture "$ROOT_DIR/testdata/smoke/workspace/ExampleWorkspace" "WorkspaceApp"
 
 echo "delegated smoke checks passed"

@@ -310,7 +310,7 @@ go test ./...
 make smoke
 ```
 
-`make smoke` builds xless locally, copies repo-owned delegated fixtures to `/tmp`, and runs real `info`, `build`, and `clean` checks against both a minimal `.xcodeproj` app and a minimal `.xcworkspace` app. it does not depend on any personal local projects.
+`make smoke` builds xless locally, copies repo-owned fixtures to `/tmp`, and runs real delegated `info`, `build`, and `clean` checks against a minimal `.xcodeproj` app plus parser/info checks against a minimal `.xcworkspace` fixture. it does not depend on any personal local projects.
 
 ## license
 

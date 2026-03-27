@@ -176,7 +176,7 @@ go test ./...
 make smoke
 ```
 
-`make smoke` runs real delegated project/workspace checks against repo-owned fixtures under `testdata/smoke/`. use it when you need to verify xcodeproj / xcworkspace behavior without relying on local personal apps.
+`make smoke` runs real delegated project checks plus workspace parser/info checks against repo-owned fixtures under `testdata/smoke/`. use it when you need to verify xcodeproj / xcworkspace behavior without relying on local personal apps.
 
 ## common workflows
 
