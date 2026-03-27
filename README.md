@@ -261,8 +261,10 @@ defaults:
 
 ```
 --json          output as newline-delimited json
+--config        path to config file (default: ./xless.yml)
 --platform      simulator or device
 --target        build target name
+--scheme        xcode scheme name for project/workspace builds
 --build-config  build configuration name (for example: Debug or Release)
 --device        device name or UDID
 --verbose       enable verbose output
@@ -276,13 +278,14 @@ every command supports `--json` for machine-readable output:
 ```sh
 $ xless info --json
 {"type":"data","message":"project","data":{"name":"MyApp","mode":"xcodeproj","targets":"3"}}
+{"type":"data","message":"selection","data":{"target":"MyApp","platform":"simulator","config":"debug","backend":"xcodebuild","xcode_scheme":"MyApp","xcode_selector":"-scheme=MyApp"}}
 {"type":"data","message":"target:MyApp","data":{"name":"MyApp","bundle_id":"com.example.MyApp",...}}
 
 $ xless build --json
-{"type":"info","message":"build","data":{"target":"MyApp","platform":"simulator","config":"debug"}}
-{"type":"info","message":"compile","data":{"files":"3"}}
+{"type":"info","message":"build","data":{"target":"MyApp","platform":"simulator","config":"debug","backend":"xcodebuild","scheme":"MyApp"}}
+{"type":"info","message":"xcodebuild","data":{"status":"running"}}
 {"type":"success","message":"build complete","data":{"output":".build/MyApp/MyApp.app","time":"1.2s"}}
-{"type":"data","message":"build","data":{"target":"MyApp","bundle_id":"com.example.MyApp","platform":"simulator","config":"debug","bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
+{"type":"data","message":"build","data":{"target":"MyApp","bundle_id":"com.example.MyApp","platform":"simulator","config":"debug","backend":"xcodebuild","scheme":"MyApp","xcode_selector":"-scheme=MyApp","bundle":".build/MyApp/MyApp.app","time":"1.2s"}}
 
 $ xless devices --json
 {"type":"data","message":"simulator","data":{"name":"iPhone 16 Pro","udid":"...","state":"Booted","runtime":"iOS 18.2"}}
